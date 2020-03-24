@@ -1,5 +1,5 @@
 import numpy as np
-
+from math import pi
 
 def convert_phi2phik(basis, phi_val, phi_grid=None):
     '''
@@ -52,3 +52,15 @@ def convert_ck2dist(basis, ck, grid=None, size=1.):
 
     val = np.stack([np.dot(basis.fk(x), ck) for x in grid])
     return val
+
+def normalize_angle(angle):
+    '''
+    normalize angle into [-pi, pi]
+    '''
+    normAngle = angle
+    while normAngle > pi:
+        normAngle -= 2*pi
+    while normAngle < -pi:
+        normAngle += 2*pi
+
+    return normAngle

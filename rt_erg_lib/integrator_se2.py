@@ -77,3 +77,10 @@ class IntegratorSE2(object):
         '''
         self.state = self.state + self.f(self.state, a) * self.dt + noise * np.random.randn(self.observation_space.shape[0])
         return self.state.copy()
+
+    def Gx(self, x, u):
+        return np.array([
+            [1, 0, -u[0] * sin(x[2]) * self.dt],
+            [0, 1, u[0] * cos(x[2]) * self.dt],
+            [0, 0, 1]
+        ])
