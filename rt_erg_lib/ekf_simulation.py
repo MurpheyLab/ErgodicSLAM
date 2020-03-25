@@ -78,7 +78,7 @@ class simulation_slam():
             # observation model
             true_landmarks = []
             observations = []
-            for i in range(self.landmarks.shape[0]):
+            for i in range(self.nLandmark):
                 item = self.landmarks[i]
                 dist = sqrt((item[0]-state_true[0])**2 + (item[1]-state_true[1])**2)
                 if(dist <= self.sensor_range):
@@ -87,13 +87,17 @@ class simulation_slam():
                     noisy_observation[1:] += self.measure_noise * np.random.randn(2)
                     observations.append(noisy_observation)
             self.log['true_landmarks'].append(true_landmarks)
-            self.log['observations'].append(observations)
+            self.log['observations'].append(np.array(observations))
+            print(self.log['observations'][t])
 
             #########################
             # EKF SLAM
             #########################
+            mean[2] = normalize_angle(mean[2])
             predict_mean, predict_cov = self.ekf_slam_prediction(mean, cov, ctrl, self.R)
+            predict_mean[2] = normalize_angle(predict_mean[2])
             predict_mean, predict_cov = self.ekf_correction(predict_mean, predict_cov, observations, self.Q)
+            predict_mean[2] = normalize_angle(predict_mean[2])
 
             self.log['mean'].append(predict_mean)
             self.log['covariance'].append(predict_cov)
@@ -198,7 +202,9 @@ class simulation_slam():
             if measurement[1] * zi[1] < 0:
                 print("\nmeasurement:\t", measurement)
                 print("zi: \t\t", zi)
-            mean += np.dot(K, measurement - zi)
+            diff_z = measurement - zi
+            diff_z[1] = normalize_angle(diff_z[1])
+            mean += np.dot(K, diff_z)
             cov -= np.dot(np.dot(K, H), cov)
 
         return mean, cov

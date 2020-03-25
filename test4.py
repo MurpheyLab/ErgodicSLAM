@@ -15,13 +15,14 @@ import autograd.numpy as np
 size = 20.0
 # size = 25.0
 noise = 0.005
-init_state = np.array([5., 5., 0.0])
+init_state = np.array([11., 7., 0.0])
 envTrue = IntegratorSE2(size=size)
 modelTrue = IntegratorSE2(size=size)
 envDR = IntegratorSE2(size=size)
 modelDR = IntegratorSE2(size=size)
 
 means = [np.array([14.5, 5.5]), np.array([6.5, 15.5])]
+# means = [np.array([10.5, 5.5]), np.array([10.5, 15.5])]
 vars = [np.array([1.2, 1.2])**2, np.array([1.2, 1.2])**2]
 t_dist = TargetDist(num_pts=50, means=means, vars=vars, size=size)
 
@@ -31,22 +32,22 @@ ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=100, num_basis=15, batch_s
 ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
 """start simulation"""
-tf = 1000
-# landmarks1 = np.random.uniform(2.5, 15.0, size=(8, 2))
-# landmarks2 = np.random.uniform(15.0, 17.5, size=(8, 2))
-# landmarks = np.concatenate((landmarks1, landmarks2))
-landmarks = np.array([
-    [2.4, 10.1],
-    [17.4, 3.0],
-    [4.5, 6.5],
-    [12.5, 9.8],
-    [1.9, 17.9],
-    [9.1, 2.3],
-    [12.3, 14.5],
-    [17.8, 13.1],
-    [4.9, 9.0]
-])
-sensor_range = 5
+tf = 2000
+landmarks1 = np.random.uniform(2.5, 15.0, size=(10, 2))
+landmarks2 = np.random.uniform(15.0, 17.5, size=(10, 2))
+landmarks = np.concatenate((landmarks1, landmarks2))
+# landmarks = np.array([
+#     [2.4, 10.1],
+#     [17.4, 3.0],
+#     [4.5, 6.5],
+#     [12.5, 9.8],
+#     [1.9, 17.9],
+#     [9.1, 2.3],
+#     [12.3, 14.5],
+#     [17.8, 13.1],
+#     [4.9, 9.0]
+# ])
+sensor_range = 7
 motion_noise = np.array([0.2, 0.2, 0.1]) ** 2
 # motion_noise = np.zeros(3)
 measure_noise = np.array([0.1, 0.1]) ** 2
