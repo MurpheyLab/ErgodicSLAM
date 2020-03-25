@@ -67,7 +67,7 @@ class simulation_slam():
             # generate control and measurement data
             #########################
             # this is what robot thinks it's doing
-            ctrl = self.erg_ctrl_dr(state_dr)
+            ctrl = self.erg_ctrl_dr(mean[0:self.nStates])
             state_dr = self.env_dr.step(ctrl)
             self.log['trajectory_dr'].append(state_dr)
 

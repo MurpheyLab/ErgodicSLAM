@@ -33,9 +33,22 @@ ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid
 
 """start simulation"""
 tf = 2000
-landmarks1 = np.random.uniform(2.5, 15.0, size=(10, 2))
-landmarks2 = np.random.uniform(15.0, 17.5, size=(10, 2))
+# lanmark distribution 1
+# landmarks1 = np.random.uniform(2.5, 15.0, size=(10, 2))
+# landmarks2 = np.random.uniform(15.0, 17.5, size=(10, 2))
+# landmarks = np.concatenate((landmarks1, landmarks2))
+
+# lanmark distribution 2
+landmarks1 = np.random.uniform(2.5, 8.0, size=(10, 2))
+landmarks2 = np.random.uniform(13.0, 19.5, size=(10, 2))
 landmarks = np.concatenate((landmarks1, landmarks2))
+
+# lanmark distribution 3
+# landmarks1 = np.random.uniform(7.5, 12.0, size=(10, 2))
+# landmarks2 = np.random.uniform(1.0, 19.5, size=(10, 2))
+# landmarks = np.concatenate((landmarks1, landmarks2))
+
+# landmark distribution 4
 # landmarks = np.array([
 #     [2.4, 10.1],
 #     [17.4, 3.0],
@@ -47,7 +60,8 @@ landmarks = np.concatenate((landmarks1, landmarks2))
 #     [17.8, 13.1],
 #     [4.9, 9.0]
 # ])
-sensor_range = 7
+
+sensor_range = 4
 motion_noise = np.array([0.2, 0.2, 0.1]) ** 2
 # motion_noise = np.zeros(3)
 measure_noise = np.array([0.1, 0.1]) ** 2
