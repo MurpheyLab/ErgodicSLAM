@@ -1,5 +1,3 @@
-import matplotlib
-# matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from matplotlib import animation
 import autograd.numpy as np
@@ -31,15 +29,11 @@ class simulation_slam():
 
         self.motion_noise = motion_noise
         self.R = np.diag(motion_noise) ** 2
-        # self.R = np.sqrt(np.diag(motion_noise))
-        print("R mat: ", self.R)
         self.measure_noise = measure_noise
         self.Q = np.diag(measure_noise) ** 2
-        # self.Q = np.sqrt(np.diag(measure_noise))
-        print("Q mat: ", self.Q)
         self.observed_landmarks = np.zeros(self.landmarks.shape[0])
 
-    def start(self, report=False):
+    def start(self, report=False, debug=False):
         #########################
         # initialize mean and covariance matrix
         #########################
@@ -67,7 +61,10 @@ class simulation_slam():
             # generate control and measurement data
             #########################
             # this is what robot thinks it's doing
-            ctrl = self.erg_ctrl_dr(mean[0:self.nStates])
+            if debug: # debug mode: robot runs a circle
+                ctrl = np.array([2.0, 0.5])
+            else:
+                ctrl = self.erg_ctrl_dr(mean[0:self.nStates])
             state_dr = self.env_dr.step(ctrl)
             self.log['trajectory_dr'].append(state_dr)
 
@@ -88,7 +85,6 @@ class simulation_slam():
                     observations.append(noisy_observation)
             self.log['true_landmarks'].append(true_landmarks)
             self.log['observations'].append(np.array(observations))
-            print(self.log['observations'][t])
 
             #########################
             # EKF SLAM
@@ -104,9 +100,6 @@ class simulation_slam():
 
             mean = predict_mean
             cov = predict_cov
-
-            print("\nest:\t", mean[0:2])
-            print("true:\t", state_true[0:2])
 
         print("simulation finished.")
 
@@ -199,9 +192,6 @@ class simulation_slam():
             mat3 = np.linalg.inv(mat2 + Q)
             K = np.dot(mat1, mat3)
             # update mean and covariance matrix
-            if measurement[1] * zi[1] < 0:
-                print("\nmeasurement:\t", measurement)
-                print("zi: \t\t", zi)
             diff_z = measurement - zi
             diff_z[1] = normalize_angle(diff_z[1])
             mean += np.dot(K, diff_z)
@@ -235,7 +225,6 @@ class simulation_slam():
         a = alpha * np.sqrt(0.5 * (sxx + syy + np.sqrt((sxx - syy) ** 2 + 4 * sxy ** 2)))
         b = alpha * np.sqrt(0.5 * (sxx + syy - np.sqrt((sxx - syy) ** 2 + 4 * sxy ** 2)))
         theta = mean[2] # % (2*pi)
-        # print(a, b, theta)
 
         p = self.generate_ellipse(mean[0], mean[1], theta, a, b)
         return p
@@ -246,12 +235,13 @@ class simulation_slam():
 
         xt_true = np.stack(self.log['trajectory_true'])
         traj_true = plt.scatter(xt_true[:self.tf, 0], xt_true[:self.tf, 1], s=point_size, c='red')
-        xt_dr = np.stack(self.log['trajectory_dr'])
-        traj_dr = plt.scatter(xt_dr[:self.tf, 0], xt_dr[:self.tf, 1], s=point_size, c='cyan')
+        # xt_dr = np.stack(self.log['trajectory_dr'])
+        # traj_dr = plt.scatter(xt_dr[:self.tf, 0], xt_dr[:self.tf, 1], s=point_size, c='cyan')
         xt_est = np.stack(self.log['mean'])
         traj_est = plt.scatter(xt_est[:self.tf, 0], xt_est[:self.tf, 1], s=point_size, c='green')
 
-        plt.legend([traj_true, traj_dr, traj_est], ['True Path', 'Dead Reckoning Path', 'Estimated Path'])
+        # plt.legend([traj_true, traj_dr, traj_est], ['True Path', 'Dead Reckoning Path', 'Estimated Path'])
+        plt.legend([traj_true, traj_est], ['True Path', 'Estimated Path'])
 
         ax = plt.gca()
         ax.set_aspect('equal', 'box')
@@ -260,21 +250,24 @@ class simulation_slam():
         plt.show()
         # return plt.gcf()
 
-    def animate(self, point_size=1, show_traj=True, save=None, rate=50):
+    def animate(self, point_size=1, show_traj=True, save=None, rate=50, title='Animation'):
         [xy, vals] = self.t_dist.get_grid_spec()
         plt.contourf(*xy, vals, levels=20)
-        plt.scatter(self.landmarks[:, 0], self.landmarks[:, 1], color='white')
+        plt.scatter(self.landmarks[:, 0], self.landmarks[:, 1], color='white', marker='P')
         ax = plt.gca()
         ax.set_aspect('equal', 'box')
+        ax.set_title(title)
         fig = plt.gcf()
 
         xt_true = np.stack(self.log['trajectory_true'])
-        points_true = ax.scatter([], [], s=point_size, c='red')
-        xt_dr = np.stack(self.log['trajectory_dr'])
-        points_dr = ax.scatter([], [], s=point_size, c='cyan')
+        points_true = ax.scatter([], [], s=point_size, color='red')
+        agent_true = ax.scatter([], [], s=point_size*100, color='red', marker='8')
+        # xt_dr = np.stack(self.log['trajectory_dr'])
+        # points_dr = ax.scatter([], [], s=point_size, c='cyan')
         mean_est = np.stack(self.log['mean'])
         xt_est = mean_est[:, 0:3]
-        points_est = ax.scatter([], [], s=point_size, c='green')
+        points_est = ax.scatter([], [], s=point_size, color='green')
+        agent_est = ax.scatter([], [], s=point_size*100, color='green', marker='8')
 
         observation_lines = []
         for id in range(self.landmarks.shape[0]):
@@ -282,7 +275,8 @@ class simulation_slam():
 
         agent_ellipse = ax.scatter([], [], s=point_size, c='white')
 
-        plt.legend([points_true, points_dr, points_est], ['True Path', 'Dead Reckoning Path', 'Estimated Path'])
+        # plt.legend([points_true, points_dr, points_est], ['True Path', 'Dead Reckoning Path', 'Estimated Path'])
+        plt.legend([agent_true, agent_est], ['True Path', 'Estimated Path'])
 
         sensor_points = []
         for id in range(self.landmarks.shape[0]):
@@ -293,19 +287,18 @@ class simulation_slam():
             # visualize agent location / trajectory
             if(show_traj):
                 points_true.set_offsets(np.array([xt_true[:i, 0], xt_true[:i, 1]]).T)
-                points_dr.set_offsets(np.array([xt_dr[:i, 0], xt_dr[:i, 1]]).T)
                 points_est.set_offsets(np.array([xt_est[:i, 0], xt_est[:i, 1]]).T)
+                agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
+                agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
             else:
-                points_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
-                points_true.set_offsets(np.array([[xt_dr[i, 0]], [xt_dr[i, 1]]]).T)
-                points_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
+                agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
+                agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
 
             # visualize agent covariance matrix as ellipse
             mean = self.log['mean'][i]
             mean = mean[0:self.nStates]
             cov = self.log['covariance'][i]
             cov = cov[0:self.nStates-1, 0:self.nStates-1]
-            # print(cov)
             p_agent = self.generate_cov_ellipse(mean, cov, alpha=1)
             agent_ellipse.set_offsets(np.array([p_agent[0, :], p_agent[1, :]]).T)
 
@@ -324,7 +317,8 @@ class simulation_slam():
                 sensor_points[id][0].set_ydata([xt_true[i, 1], loc_y])
 
             # return matplotlib objects for animation
-            ret = [points_true, points_dr, agent_ellipse, points_est]
+            # ret = [points_true, points_dr, agent_ellipse, points_est]
+            ret = [points_true, agent_ellipse, points_est, agent_true, agent_est]
             for item in sensor_points:
                 ret.append(item[0])
             return ret
@@ -344,9 +338,9 @@ class simulation_slam():
         ck_true = convert_traj2ck(self.erg_ctrl_true.basis, path_true)
         val_true = convert_ck2dist(self.erg_ctrl_true.basis, ck_true, size=self.size)
 
-        path_dr = np.stack(self.log['trajectory_dr'])[:self.tf, self.model_dr.explr_idx]
-        ck_dr = convert_traj2ck(self.erg_ctrl_dr.basis, path_dr)
-        val_dr = convert_ck2dist(self.erg_ctrl_dr.basis, ck_dr, size=self.size)
+        # path_dr = np.stack(self.log['trajectory_dr'])[:self.tf, self.model_dr.explr_idx]
+        # ck_dr = convert_traj2ck(self.erg_ctrl_dr.basis, path_dr)
+        # val_dr = convert_ck2dist(self.erg_ctrl_dr.basis, ck_dr, size=self.size)
 
         path_est = np.stack(self.log['mean'])[:self.tf, self.model_dr.explr_idx]
         ck_est = convert_traj2ck(self.erg_ctrl_dr.basis, path_est)
@@ -357,22 +351,22 @@ class simulation_slam():
         plt.close()
         fig = plt.figure()
 
-        ax1 = fig.add_subplot(221)
+        ax1 = fig.add_subplot(131)
         ax1.contourf(*xy, vals, levels=20)
         ax1.set_aspect('equal', 'box')
         ax1.set_title('Spatial Distribution')
 
-        ax2 = fig.add_subplot(222)
+        ax2 = fig.add_subplot(132)
         ax2.contourf(*xy, val_true.reshape(50, 50), levels=20)
         ax2.set_aspect('equal', 'box')
         ax2.set_title('Actual Path Statistics')
 
-        ax3 = fig.add_subplot(223)
-        ax3.contourf(*xy, val_dr.reshape(50, 50), levels=20)
-        ax3.set_aspect('equal', 'box')
-        ax3.set_title('Dead Reckoning Path Statistics')
+        # ax3 = fig.add_subplot(223)
+        # ax3.contourf(*xy, val_dr.reshape(50, 50), levels=20)
+        # ax3.set_aspect('equal', 'box')
+        # ax3.set_title('Dead Reckoning Path Statistics')
 
-        ax4 = fig.add_subplot(224)
+        ax4 = fig.add_subplot(133)
         ax4.contourf(*xy, val_est.reshape(50, 50), levels=20)
         ax4.set_aspect('equal', 'box')
         ax4.set_title('Estimated Path Statistics')

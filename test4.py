@@ -33,20 +33,20 @@ ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid
 
 """start simulation"""
 tf = 2000
-# lanmark distribution 1
-# landmarks1 = np.random.uniform(2.5, 15.0, size=(10, 2))
-# landmarks2 = np.random.uniform(15.0, 17.5, size=(10, 2))
+# lanmark distribution 1: uniform
+# landmarks1 = np.random.uniform(0.5, 19.5, size=(10, 2))
+# landmarks2 = np.random.uniform(0.5, 19.5, size=(10, 2))
 # landmarks = np.concatenate((landmarks1, landmarks2))
 
-# lanmark distribution 2
-landmarks1 = np.random.uniform(2.5, 8.0, size=(10, 2))
-landmarks2 = np.random.uniform(13.0, 19.5, size=(10, 2))
+# lanmark distribution 2: gathered at center
+# landmarks1 = np.random.uniform(8.5, 15.0, size=(10, 2))
+# landmarks2 = np.random.uniform(6.0, 13.5, size=(10, 2))
+# landmarks = np.concatenate((landmarks1, landmarks2))
+
+# lanmark distribution 3: gathered at two corners
+landmarks1 = np.random.uniform(11.5, 19.0, size=(10, 2))
+landmarks2 = np.random.uniform(1.0, 9.5, size=(10, 2))
 landmarks = np.concatenate((landmarks1, landmarks2))
-
-# lanmark distribution 3
-# landmarks1 = np.random.uniform(7.5, 12.0, size=(10, 2))
-# landmarks2 = np.random.uniform(1.0, 19.5, size=(10, 2))
-# landmarks = np.concatenate((landmarks1, landmarks2))
 
 # landmark distribution 4
 # landmarks = np.array([

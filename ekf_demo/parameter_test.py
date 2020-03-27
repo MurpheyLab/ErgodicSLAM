@@ -34,20 +34,20 @@ ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid
 """start simulation"""
 tf = 2000
 # lanmark distribution 1: uniform
-# landmarks1 = np.random.uniform(0.5, 19.5, size=(20, 2))
-# landmarks2 = np.random.uniform(0.5, 19.5, size=(20, 2))
-# landmarks = np.concatenate((landmarks1, landmarks2))
+landmarks1 = np.random.uniform(0.5, 19.5, size=(10, 2))
+landmarks2 = np.random.uniform(0.5, 19.5, size=(10, 2))
+landmarks = np.concatenate((landmarks1, landmarks2))
 
 # lanmark distribution 3: gathered at two corners
-landmarks1 = np.random.uniform(11.5, 19.0, size=(10, 2))
-landmarks2 = np.random.uniform(1.0, 9.5, size=(10, 2))
-landmarks = np.concatenate((landmarks1, landmarks2))
+# landmarks1 = np.random.uniform(11.5, 19.0, size=(10, 2))
+# landmarks2 = np.random.uniform(1.0, 9.5, size=(10, 2))
+# landmarks = np.concatenate((landmarks1, landmarks2))
 
 sensor_range = 4
 motion_noise = np.array([0.3, 0.2, 0.1]) ** 2
 # motion_noise = np.zeros(3)
 measure_noise = np.array([0.2, 0.2]) ** 2
-# measure_noise = np.zeros(2)
+# measure_noise = np.array([1e-03, 1e-03]) ** 2
 erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise)
 erg_ctrl_sim.start(report=True, debug=False)
 erg_ctrl_sim.animate(point_size=1, show_traj=True, title='Uniform Landmarks Distribution')
