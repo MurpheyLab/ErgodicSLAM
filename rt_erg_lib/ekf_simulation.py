@@ -3,8 +3,6 @@ from matplotlib import animation
 import autograd.numpy as np
 from .utils import convert_ck2dist, convert_traj2ck, normalize_angle
 from tqdm import tqdm
-import time
-import numpy as np
 from numpy import sin, cos, sqrt
 import math
 from math import pi
@@ -56,7 +54,7 @@ class simulation_slam():
         # simulation loop
         ##########################
         self.log = {'trajectory_true': [], 'trajectory_dr': [], 'true_landmarks': [], 'observations': [], 'mean': [],
-                    'covariance': []}
+                    'covariance': [], 'planning_mean': [], 'planning_cov': []}
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
@@ -90,10 +88,17 @@ class simulation_slam():
             self.log['true_landmarks'].append(true_landmarks)
             self.log['observations'].append(np.array(observations))
 
+            ########################
+            # Planning prediction
+            ########################
+            planning_predict_mean, planning_predict_cov = self.planning_prediction(mean, cov, ctrl, self.R, self.Q)
+            self.log['planning_mean'].append(planning_predict_mean)
+            self.log['planning_cov'].append(planning_predict_cov)
+
             #########################
             # EKF SLAM
             #########################
-            mean[2] = normalize_angle(mean[2])
+            # mean[2] = normalize_angle(mean[2])
             predict_mean, predict_cov = self.ekf_slam_prediction(mean, cov, ctrl, self.R)
             predict_mean[2] = normalize_angle(predict_mean[2])
             predict_mean, predict_cov = self.ekf_correction(predict_mean, predict_cov, observations, self.Q)
@@ -203,6 +208,51 @@ class simulation_slam():
 
         return mean, cov
 
+    def planning_prediction(self, mean, cov, ctrl, R, Q):
+        # ekf predict
+        predict_mean = mean.copy()
+        predict_cov = cov.copy()
+        predict_mean, predict_cov = self.ekf_slam_prediction(predict_mean, predict_cov, ctrl, R)
+
+        # predict observation using maximum likelihood
+        observations = []
+        agent_mean = predict_mean[0: self.nStates]
+        for id in range(self.nLandmark):
+            if self.observed_landmarks[id] == 1:
+                landmark_mean = predict_mean[2 + 2 * id + 1 : 2 + 2 * id + 2 + 1]
+                dist = sqrt((agent_mean[0] - landmark_mean[0])**2 + (agent_mean[1] - landmark_mean[1])**2)
+                if dist < self.sensor_range:
+                    predict_observation = self.range_bearing(id, agent_mean, landmark_mean)
+                    observations.append(predict_observation)
+            else: # landmark hasn't been observed yet
+                pass
+
+        # ekf correct
+        predict_mean, predict_cov = self.ekf_correction(predict_mean, predict_cov, observations, Q)
+
+        # return
+        return predict_mean, predict_cov
+
+    # def planning_prediction(self, mean, cov, ctrl, R, Q):
+    #     # predict mean (only update robot state)
+    #     predict_mean = mean.copy()
+    #     predict_mean[0:self.nStates] += self.env_true.f(mean[0:self.nStates], ctrl) * self.env_true.dt
+    #     agent_mean = predict_mean[0 : self.nStates]
+    #     # predict covariance
+    #
+    #     # predict observation
+    #     observations = []
+    #     for id in range(self.nLandmark):
+    #         if self.observed_landmarks[id] == 1:
+    #             landmark_mean = predict_mean[2 + 2 * id + 1 : 2 + 2 * id + 2 + 1]
+    #             dist = sqrt((agent_mean[0] - landmark_mean[0])**2 + (agent_mean[1] - landmark_mean[1])**2)
+    #             if dist < self.sensor_range:
+    #                 predict_observation = self.range_bearing(id, agent_mean, landmark_mean)
+    #                 observations.append(predict_observation)
+    #         else: # landmark hasn't been observed yet
+    #             pass
+
+
     def generate_ellipse(self, x, y, theta, a, b):
         NPOINTS = 100
         # compose point vector
@@ -288,12 +338,19 @@ class simulation_slam():
         xt_true = np.stack(self.log['trajectory_true'])
         points_true = ax.scatter([], [], s=point_size, color='red')
         agent_true = ax.scatter([], [], s=point_size * 100, color='red', marker='8')
+
         # xt_dr = np.stack(self.log['trajectory_dr'])
         # points_dr = ax.scatter([], [], s=point_size, c='cyan')
+
         mean_est = np.stack(self.log['mean'])
         xt_est = mean_est[:, 0:3]
         points_est = ax.scatter([], [], s=point_size, color='green')
         agent_est = ax.scatter([], [], s=point_size * 100, color='green', marker='8')
+
+        mean_plan = np.stack(self.log['planning_mean'])
+        xt_plan = mean_plan[:, 0:3]
+        points_plan = ax.scatter([], [], s=point_size, color='yellow')
+        agent_plan = ax.scatter([], [], s=point_size * 100, color='yellow', marker='8')
 
         observation_lines = []
         landmark_ellipses = []
@@ -301,7 +358,8 @@ class simulation_slam():
             observation_lines.append(ax.plot([], [], color='orange'))
             landmark_ellipses.append(ax.scatter([], [], s=point_size, c='cyan'))
 
-        agent_ellipse = ax.scatter([], [], s=point_size, c='white')
+        agent_ellipse = ax.scatter([], [], s=point_size, c='green')
+        agent_plan_ellipse = ax.scatter([], [], s=point_size, c='yellow')
 
         # plt.legend([points_true, points_dr, points_est], ['True Path', 'Dead Reckoning Path', 'Estimated Path'])
         plt.legend([agent_true, agent_est], ['True Path', 'Estimated Path'])
@@ -316,11 +374,15 @@ class simulation_slam():
             if (show_traj):
                 points_true.set_offsets(np.array([xt_true[:i, 0], xt_true[:i, 1]]).T)
                 points_est.set_offsets(np.array([xt_est[:i, 0], xt_est[:i, 1]]).T)
+                # points_plan.set_offsets(np.array([xt_plan[:i, 0], xt_plan[:i, 1]]).T)
+
                 agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
                 agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
+                agent_plan.set_offsets(np.array([[xt_plan[i, 0]], [xt_plan[i, 1]]]).T)
             else:
                 agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
                 agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
+                agent_plan.set_offsets(np.array([[xt_plan[i, 0]], [xt_plan[i, 1]]]).T)
 
             # visualize agent covariance matrix as ellipse
             mean = self.log['mean'][i]
@@ -329,6 +391,14 @@ class simulation_slam():
             agent_cov = cov[0:self.nStates - 1, 0:self.nStates - 1]
             p_agent = self.generate_cov_ellipse(agent_mean, agent_cov, alpha=1)
             agent_ellipse.set_offsets(np.array([p_agent[0, :], p_agent[1, :]]).T)
+
+            # visualize predicted planning covariance ellipse
+            planned_mean = self.log['planning_mean'][i]
+            planned_agent_mean = planned_mean[0:self.nStates]
+            planned_cov = self.log['planning_cov'][i]
+            planned_agent_cov = planned_cov[0:self.nStates - 1, 0:self.nStates - 1]
+            planned_p_agent = self.generate_cov_ellipse(planned_agent_mean, planned_agent_cov, alpha=1)
+            agent_plan_ellipse.set_offsets(np.array([planned_p_agent[0, :], planned_p_agent[1, :]]).T)
 
             # visualize landmark mean and covariance
             for id in range(self.nLandmark):
@@ -359,7 +429,7 @@ class simulation_slam():
 
             # return matplotlib objects for animation
             # ret = [points_true, points_dr, agent_ellipse, points_est]
-            ret = [points_true, agent_ellipse, points_est, agent_true, agent_est]
+            ret = [points_true, agent_ellipse, points_est, agent_true, agent_est, agent_plan_ellipse, agent_plan, points_plan]
             for item in sensor_points:
                 ret.append(item[0])
             for item in landmark_ellipses:
