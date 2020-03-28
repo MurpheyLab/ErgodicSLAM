@@ -9,8 +9,10 @@ from numpy import sin, cos, sqrt
 import math
 from math import pi
 
+
 class simulation_slam():
-    def __init__(self, size, init_state, t_dist, model_true, erg_ctrl_true, env_true, model_dr, erg_ctrl_dr, env_dr, tf, landmarks, sensor_range, motion_noise, measure_noise):
+    def __init__(self, size, init_state, t_dist, model_true, erg_ctrl_true, env_true, model_dr, erg_ctrl_dr, env_dr, tf,
+                 landmarks, sensor_range, motion_noise, measure_noise):
         self.size = size
         self.init_state = init_state
         self.tf = tf
@@ -32,12 +34,13 @@ class simulation_slam():
         self.measure_noise = measure_noise
         self.Q = np.diag(measure_noise) ** 2
         self.observed_landmarks = np.zeros(self.landmarks.shape[0])
+        self.threshold = 99999999
 
     def start(self, report=False, debug=False):
         #########################
         # initialize mean and covariance matrix
         #########################
-        self.nLandmark = self.landmarks.shape[0]     # number of landmarks
+        self.nLandmark = self.landmarks.shape[0]  # number of landmarks
         self.nStates = self.init_state.shape[0]
         self.dim = self.nStates + 2 * self.nLandmark
         mean = np.zeros(self.dim)
@@ -47,12 +50,13 @@ class simulation_slam():
                 mean[i] = self.init_state[i]
                 cov[i, i] = 0
             else:
-                cov[i, i] = 99999999
+                cov[i, i] = self.threshold
 
         ##########################
         # simulation loop
         ##########################
-        self.log = {'trajectory_true': [], 'trajectory_dr': [], 'true_landmarks': [], 'observations': [], 'mean': [], 'covariance': []}
+        self.log = {'trajectory_true': [], 'trajectory_dr': [], 'true_landmarks': [], 'observations': [], 'mean': [],
+                    'covariance': []}
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
@@ -61,7 +65,7 @@ class simulation_slam():
             # generate control and measurement data
             #########################
             # this is what robot thinks it's doing
-            if debug: # debug mode: robot runs a circle
+            if debug:  # debug mode: robot runs a circle
                 ctrl = np.array([2.0, 0.5])
             else:
                 ctrl = self.erg_ctrl_dr(mean[0:self.nStates])
@@ -77,8 +81,8 @@ class simulation_slam():
             observations = []
             for i in range(self.nLandmark):
                 item = self.landmarks[i]
-                dist = sqrt((item[0]-state_true[0])**2 + (item[1]-state_true[1])**2)
-                if(dist <= self.sensor_range):
+                dist = sqrt((item[0] - state_true[0]) ** 2 + (item[1] - state_true[1]) ** 2)
+                if (dist <= self.sensor_range):
                     true_landmarks.append(i)
                     noisy_observation = self.range_bearing(i, state_true, item)
                     noisy_observation[1:] += self.measure_noise * np.random.randn(2)
@@ -104,7 +108,7 @@ class simulation_slam():
         print("simulation finished.")
 
     def range_bearing(self, id, agent, landmark):
-        delta = landmark - agent[0:self.nStates-1]
+        delta = landmark - agent[0:self.nStates - 1]
         range = np.sqrt(np.dot(delta.T, delta))
         bearing = math.atan2(delta[1], delta[0]) - agent[2]
         bearing = normalize_angle(bearing)
@@ -139,8 +143,8 @@ class simulation_slam():
 
         # calculate matrix G for updating predicted covariance matrix
         Jacobian = np.array([[0, 0, -sin(mean[2]) * ctrl[0] * self.env_true.dt],
-                             [0, 0,  cos(mean[2]) * ctrl[0] * self.env_true.dt],
-                             [0, 0,  0]])
+                             [0, 0, cos(mean[2]) * ctrl[0] * self.env_true.dt],
+                             [0, 0, 0]])
         G = np.eye(cov.shape[0]) + np.dot(np.dot(F.T, Jacobian), F)
 
         # update predicted covariance
@@ -160,7 +164,7 @@ class simulation_slam():
             id = int(obs[0])
             measurement = obs[1:]
             # if landmark not observed, initialize mean
-            if(self.observed_landmarks[id] == 0):
+            if (self.observed_landmarks[id] == 0):
                 self.observed_landmarks[id] = 1
                 loc_x = mean[0] + measurement[0] * cos(mean[2] + measurement[1])
                 loc_y = mean[1] + measurement[0] * sin(mean[2] + measurement[1])
@@ -171,7 +175,7 @@ class simulation_slam():
             delta = est_landmark - mean[0:2]
             zi = self.range_bearing(id, mean[0:3], est_landmark)
             zi = zi[1:]
-            q = zi[0]**2
+            q = zi[0] ** 2
             q_sqrt = zi[0]
             # generate matrix F
             F = np.zeros((5, 3 + 2 * self.nLandmark))
@@ -185,7 +189,7 @@ class simulation_slam():
                 [-q_sqrt * delta[0], -q_sqrt * delta[1], 0, q_sqrt * delta[0], q_sqrt * delta[1]],
                 [delta[1], -delta[0], -q, -delta[1], delta[0]]
             ])
-            H = (1/zi[0]**2) * np.dot(temp, F)
+            H = (1 / zi[0] ** 2) * np.dot(temp, F)
             # calculate Kalman gain: matrix K
             mat1 = np.dot(cov, H.T)
             mat2 = np.dot(np.dot(H, cov), H.T)
@@ -202,7 +206,7 @@ class simulation_slam():
     def generate_ellipse(self, x, y, theta, a, b):
         NPOINTS = 100
         # compose point vector
-        ivec = np.arange(0, 2*pi, 2*pi/NPOINTS)
+        ivec = np.arange(0, 2 * pi, 2 * pi / NPOINTS)
         p = np.zeros((2, NPOINTS))
         p[0, :] = a * cos(ivec)
         p[1, :] = b * sin(ivec)
@@ -210,7 +214,7 @@ class simulation_slam():
         # translate and rotate
         R = np.array([
             [cos(theta), -sin(theta)],
-            [sin(theta),  cos(theta)]
+            [sin(theta), cos(theta)]
         ])
         p = np.dot(R, p)
         p[0, :] += x
@@ -219,14 +223,36 @@ class simulation_slam():
         return p
 
     def generate_cov_ellipse(self, mean, cov, alpha=1):
-        sxx = cov[0,0]
-        syy = cov[1,1]
-        sxy = cov[0,1]
+        sxx = cov[0, 0]
+        syy = cov[1, 1]
+        sxy = cov[0, 1]
         a = alpha * np.sqrt(0.5 * (sxx + syy + np.sqrt((sxx - syy) ** 2 + 4 * sxy ** 2)))
         b = alpha * np.sqrt(0.5 * (sxx + syy - np.sqrt((sxx - syy) ** 2 + 4 * sxy ** 2)))
-        theta = mean[2] # % (2*pi)
+        theta = mean[2]  # % (2*pi)
 
         p = self.generate_ellipse(mean[0], mean[1], theta, a, b)
+        return p
+
+    def generate_landmark_ellipse(self, mean, cov, alpha=1):
+        sxx = cov[0, 0]
+        syy = cov[1, 1]
+        sxy = cov[0, 1]
+        a = alpha * np.sqrt(0.5 * (sxx + syy + np.sqrt((sxx - syy) ** 2 + 4 * sxy ** 2)))
+        b = alpha * np.sqrt(0.5 * (sxx + syy - np.sqrt((sxx - syy) ** 2 + 4 * sxy ** 2)))
+        x = mean[0]
+        y = mean[1]
+
+        NPOINTS = 100
+        # compose point vector
+        ivec = np.arange(0, 2 * pi, 2 * pi / NPOINTS)
+        p = np.zeros((2, NPOINTS))
+        p[0, :] = a * cos(ivec)
+        p[1, :] = b * sin(ivec)
+
+        # translate
+        p[0, :] += x
+        p[1, :] += y
+
         return p
 
     def plot(self, point_size=1, save=None):
@@ -261,17 +287,19 @@ class simulation_slam():
 
         xt_true = np.stack(self.log['trajectory_true'])
         points_true = ax.scatter([], [], s=point_size, color='red')
-        agent_true = ax.scatter([], [], s=point_size*100, color='red', marker='8')
+        agent_true = ax.scatter([], [], s=point_size * 100, color='red', marker='8')
         # xt_dr = np.stack(self.log['trajectory_dr'])
         # points_dr = ax.scatter([], [], s=point_size, c='cyan')
         mean_est = np.stack(self.log['mean'])
         xt_est = mean_est[:, 0:3]
         points_est = ax.scatter([], [], s=point_size, color='green')
-        agent_est = ax.scatter([], [], s=point_size*100, color='green', marker='8')
+        agent_est = ax.scatter([], [], s=point_size * 100, color='green', marker='8')
 
         observation_lines = []
+        landmark_ellipses = []
         for id in range(self.landmarks.shape[0]):
             observation_lines.append(ax.plot([], [], color='orange'))
+            landmark_ellipses.append(ax.scatter([], [], s=point_size, c='cyan'))
 
         agent_ellipse = ax.scatter([], [], s=point_size, c='white')
 
@@ -285,7 +313,7 @@ class simulation_slam():
 
         def sub_animate(i):
             # visualize agent location / trajectory
-            if(show_traj):
+            if (show_traj):
                 points_true.set_offsets(np.array([xt_true[:i, 0], xt_true[:i, 1]]).T)
                 points_est.set_offsets(np.array([xt_est[:i, 0], xt_est[:i, 1]]).T)
                 agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
@@ -296,11 +324,24 @@ class simulation_slam():
 
             # visualize agent covariance matrix as ellipse
             mean = self.log['mean'][i]
-            mean = mean[0:self.nStates]
+            agent_mean = mean[0:self.nStates]
             cov = self.log['covariance'][i]
-            cov = cov[0:self.nStates-1, 0:self.nStates-1]
-            p_agent = self.generate_cov_ellipse(mean, cov, alpha=1)
+            agent_cov = cov[0:self.nStates - 1, 0:self.nStates - 1]
+            p_agent = self.generate_cov_ellipse(agent_mean, agent_cov, alpha=1)
             agent_ellipse.set_offsets(np.array([p_agent[0, :], p_agent[1, :]]).T)
+
+            # visualize landmark mean and covariance
+            for id in range(self.nLandmark):
+                landmark_ellipses[id].set_offsets(np.array([[], []]).T)
+
+            for id in range(self.nLandmark):
+                if mean[2 + 2 * id + 1] == 0:
+                    pass
+                else:
+                    landmark_mean = mean[2 + 2 * id + 1: 2 + 2 * id + 2 + 1]
+                    landmark_cov = cov[2 + 2 * id + 1: 2 + 2 * id + 2 + 1, 2 + 2 * id + 1: 2 + 2 * id + 2 + 1]
+                    p_landmark = self.generate_landmark_ellipse(landmark_mean, landmark_cov)
+                    landmark_ellipses[id].set_offsets(np.array([p_landmark[0, :], p_landmark[1, :]]).T)
 
             # clear observation model visualization
             for point in sensor_points:
@@ -321,9 +362,11 @@ class simulation_slam():
             ret = [points_true, agent_ellipse, points_est, agent_true, agent_est]
             for item in sensor_points:
                 ret.append(item[0])
+            for item in landmark_ellipses:
+                ret.append(item)
             return ret
 
-        anim = animation.FuncAnimation(fig, sub_animate, frames=self.tf, interval=(1000/rate), blit=True)
+        anim = animation.FuncAnimation(fig, sub_animate, frames=self.tf, interval=(1000 / rate), blit=True)
         if save is not None:
             Writer = animation.writers['ffmpeg']
             writer = Writer(fps=40, metadata=dict(artist='simulation_slam'), bitrate=5000)
