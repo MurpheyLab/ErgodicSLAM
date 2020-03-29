@@ -32,21 +32,28 @@ ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=100, num_basis=15, batch_s
 ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
 """start simulation"""
-tf = 2000
+tf = 1000
+
+# initialize user-defined landmarks
+# landmarks = np.array([[14.3, 5.5],
+#                       [13.9, 5.9]])
+landmarks = np.array([[9.5, 10.5],
+                      [10.5, 9.5]])
+
 # lanmark distribution 1: uniform
-# landmarks1 = np.random.uniform(0.5, 19.5, size=(10, 2))
-# landmarks2 = np.random.uniform(0.5, 19.5, size=(10, 2))
+# landmarks1 = np.random.uniform(0.5, 19.5, size=(15, 2))
+# landmarks2 = np.random.uniform(0.5, 19.5, size=(15, 2))
 # landmarks = np.concatenate((landmarks1, landmarks2))
 
 # lanmark distribution 2: gathered at two corners
 landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
 landmarks2 = np.random.uniform(2.0, 8.0, size=(10, 2))
-landmarks = np.concatenate((landmarks1, landmarks2))
+landmarks = np.concatenate((np.concatenate((landmarks1, landmarks2)), landmarks))
 
 # lanmark distribution 3: mixed distribution
-landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
-landmarks2 = np.random.uniform(0.5, 19.5, size=(10, 2))
-landmarks = np.concatenate((landmarks1, landmarks2))
+# landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
+# landmarks2 = np.random.uniform(0.5, 19.5, size=(10, 2))
+# landmarks = np.concatenate((landmarks1, landmarks2))
 
 sensor_range = 4
 motion_noise = np.array([0.3, 0.2, 0.1]) ** 2
@@ -55,6 +62,6 @@ measure_noise = np.array([0.15, 0.15]) ** 2
 # measure_noise = np.array([1e-03, 1e-03]) ** 2
 erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise)
 erg_ctrl_sim.start(report=True, debug=False)
-erg_ctrl_sim.animate(point_size=1, show_traj=True, title='Landmarks Distribution Test', rate=35)
+erg_ctrl_sim.animate3(point_size=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
 erg_ctrl_sim.plot(point_size=1, save=None)
 erg_ctrl_sim.path_reconstruct(save=None)

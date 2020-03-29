@@ -98,7 +98,7 @@ class simulation_slam():
             #########################
             # EKF SLAM
             #########################
-            # mean[2] = normalize_angle(mean[2])
+            mean[2] = normalize_angle(mean[2])
             predict_mean, predict_cov = self.ekf_slam_prediction(mean, cov, ctrl, self.R)
             predict_mean[2] = normalize_angle(predict_mean[2])
             predict_mean, predict_cov = self.ekf_correction(predict_mean, predict_cov, observations, self.Q)
@@ -109,6 +109,11 @@ class simulation_slam():
 
             mean = predict_mean
             cov = predict_cov
+
+            #########################
+            # Information for debug
+            #########################
+            print("robot uncertainty: ", np.linalg.det(cov[0: self.nStates, 0: self.nStates]))
 
         print("simulation finished.")
 
@@ -233,26 +238,6 @@ class simulation_slam():
         # return
         return predict_mean, predict_cov
 
-    # def planning_prediction(self, mean, cov, ctrl, R, Q):
-    #     # predict mean (only update robot state)
-    #     predict_mean = mean.copy()
-    #     predict_mean[0:self.nStates] += self.env_true.f(mean[0:self.nStates], ctrl) * self.env_true.dt
-    #     agent_mean = predict_mean[0 : self.nStates]
-    #     # predict covariance
-    #
-    #     # predict observation
-    #     observations = []
-    #     for id in range(self.nLandmark):
-    #         if self.observed_landmarks[id] == 1:
-    #             landmark_mean = predict_mean[2 + 2 * id + 1 : 2 + 2 * id + 2 + 1]
-    #             dist = sqrt((agent_mean[0] - landmark_mean[0])**2 + (agent_mean[1] - landmark_mean[1])**2)
-    #             if dist < self.sensor_range:
-    #                 predict_observation = self.range_bearing(id, agent_mean, landmark_mean)
-    #                 observations.append(predict_observation)
-    #         else: # landmark hasn't been observed yet
-    #             pass
-
-
     def generate_ellipse(self, x, y, theta, a, b):
         NPOINTS = 100
         # compose point vector
@@ -326,7 +311,7 @@ class simulation_slam():
         plt.show()
         # return plt.gcf()
 
-    def animate(self, point_size=1, show_traj=True, save=None, rate=50, title='Animation'):
+    def animate(self, point_size=1, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
         [xy, vals] = self.t_dist.get_grid_spec()
         plt.contourf(*xy, vals, levels=20)
         plt.scatter(self.landmarks[:, 0], self.landmarks[:, 1], color='white', marker='P')
@@ -378,11 +363,15 @@ class simulation_slam():
 
                 agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
                 agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
-                agent_plan.set_offsets(np.array([[xt_plan[i, 0]], [xt_plan[i, 1]]]).T)
+
+                if plan:
+                    agent_plan.set_offsets(np.array([[xt_plan[i, 0]], [xt_plan[i, 1]]]).T)
             else:
                 agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
                 agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
-                agent_plan.set_offsets(np.array([[xt_plan[i, 0]], [xt_plan[i, 1]]]).T)
+
+                if plan:
+                    agent_plan.set_offsets(np.array([[xt_plan[i, 0]], [xt_plan[i, 1]]]).T)
 
             # visualize agent covariance matrix as ellipse
             mean = self.log['mean'][i]
@@ -393,12 +382,13 @@ class simulation_slam():
             agent_ellipse.set_offsets(np.array([p_agent[0, :], p_agent[1, :]]).T)
 
             # visualize predicted planning covariance ellipse
-            planned_mean = self.log['planning_mean'][i]
-            planned_agent_mean = planned_mean[0:self.nStates]
-            planned_cov = self.log['planning_cov'][i]
-            planned_agent_cov = planned_cov[0:self.nStates - 1, 0:self.nStates - 1]
-            planned_p_agent = self.generate_cov_ellipse(planned_agent_mean, planned_agent_cov, alpha=1)
-            agent_plan_ellipse.set_offsets(np.array([planned_p_agent[0, :], planned_p_agent[1, :]]).T)
+            if plan:
+                planned_mean = self.log['planning_mean'][i]
+                planned_agent_mean = planned_mean[0:self.nStates]
+                planned_cov = self.log['planning_cov'][i]
+                planned_agent_cov = planned_cov[0:self.nStates - 1, 0:self.nStates - 1]
+                planned_p_agent = self.generate_cov_ellipse(planned_agent_mean, planned_agent_cov, alpha=1)
+                agent_plan_ellipse.set_offsets(np.array([planned_p_agent[0, :], planned_p_agent[1, :]]).T)
 
             # visualize landmark mean and covariance
             for id in range(self.nLandmark):
@@ -429,7 +419,8 @@ class simulation_slam():
 
             # return matplotlib objects for animation
             # ret = [points_true, points_dr, agent_ellipse, points_est]
-            ret = [points_true, agent_ellipse, points_est, agent_true, agent_est, agent_plan_ellipse, agent_plan, points_plan]
+            ret = [points_true, agent_ellipse, points_est, agent_true, agent_est, agent_plan_ellipse, agent_plan,
+                   points_plan]
             for item in sensor_points:
                 ret.append(item[0])
             for item in landmark_ellipses:
@@ -437,6 +428,152 @@ class simulation_slam():
             return ret
 
         anim = animation.FuncAnimation(fig, sub_animate, frames=self.tf, interval=(1000 / rate), blit=True)
+        if save is not None:
+            Writer = animation.writers['ffmpeg']
+            writer = Writer(fps=40, metadata=dict(artist='simulation_slam'), bitrate=5000)
+            anim.save(save, writer=writer)
+        plt.show()
+        # return anim
+
+    def animate3(self, point_size=1, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
+        fig = plt.gcf()
+
+        ax1 = fig.add_subplot(131)
+        [xy, vals] = self.t_dist.get_grid_spec()
+        ax1.contourf(*xy, vals, levels=20)
+        ax1.scatter(self.landmarks[:, 0], self.landmarks[:, 1], color='white', marker='P')
+        ax1.set_aspect('equal', 'box')
+        ax1.set_title(title)
+
+        ax2 = fig.add_subplot(132)
+        ax2.set_aspect('equal', 'box')
+        ax2.set_title('Actual Path Statistics')
+
+        ax3 = fig.add_subplot(133)
+        ax3.set_aspect('equal', 'box')
+        ax3.set_title('Estimated Path Statistics')
+
+        xt_true = np.stack(self.log['trajectory_true'])
+        points_true = ax1.scatter([], [], s=point_size, color='red')
+        agent_true = ax1.scatter([], [], s=point_size * 100, color='red', marker='8')
+
+        # xt_dr = np.stack(self.log['trajectory_dr'])
+        # points_dr = ax1.scatter([], [], s=point_size, c='cyan')
+
+        mean_est = np.stack(self.log['mean'])
+        xt_est = mean_est[:, 0:3]
+        points_est = ax1.scatter([], [], s=point_size, color='green')
+        agent_est = ax1.scatter([], [], s=point_size * 100, color='green', marker='8')
+
+        mean_plan = np.stack(self.log['planning_mean'])
+        xt_plan = mean_plan[:, 0:3]
+        points_plan = ax1.scatter([], [], s=point_size, color='yellow')
+        agent_plan = ax1.scatter([], [], s=point_size * 100, color='yellow', marker='8')
+
+        observation_lines = []
+        landmark_ellipses = []
+        for id in range(self.landmarks.shape[0]):
+            observation_lines.append(ax1.plot([], [], color='orange'))
+            landmark_ellipses.append(ax1.scatter([], [], s=point_size, c='cyan'))
+
+        agent_ellipse = ax1.scatter([], [], s=point_size, c='green')
+        agent_plan_ellipse = ax1.scatter([], [], s=point_size, c='yellow')
+
+        # ax1.legend([points_true, points_dr, points_est], ['True Path', 'Dead Reckoning Path', 'Estimated Path'])
+        ax1.legend([agent_true, agent_est], ['True Path', 'Estimated Path'])
+
+        sensor_points = []
+        for id in range(self.landmarks.shape[0]):
+            sensor_point = ax1.plot([], [], color='orange')
+            sensor_points.append(sensor_point)
+
+        def sub_animate(i):
+            # visualize agent location / trajectory
+            if (show_traj):
+                points_true.set_offsets(np.array([xt_true[:i, 0], xt_true[:i, 1]]).T)
+                points_est.set_offsets(np.array([xt_est[:i, 0], xt_est[:i, 1]]).T)
+                # points_plan.set_offsets(np.array([xt_plan[:i, 0], xt_plan[:i, 1]]).T)
+
+                agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
+                agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
+
+                if plan:
+                    agent_plan.set_offsets(np.array([[xt_plan[i, 0]], [xt_plan[i, 1]]]).T)
+            else:
+                agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
+                agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
+
+                if plan:
+                    agent_plan.set_offsets(np.array([[xt_plan[i, 0]], [xt_plan[i, 1]]]).T)
+
+            # visualize agent covariance matrix as ellipse
+            mean = self.log['mean'][i]
+            agent_mean = mean[0:self.nStates]
+            cov = self.log['covariance'][i]
+            agent_cov = cov[0:self.nStates - 1, 0:self.nStates - 1]
+            p_agent = self.generate_cov_ellipse(agent_mean, agent_cov, alpha=1)
+            agent_ellipse.set_offsets(np.array([p_agent[0, :], p_agent[1, :]]).T)
+
+            # visualize predicted planning covariance ellipse
+            if plan:
+                planned_mean = self.log['planning_mean'][i]
+                planned_agent_mean = planned_mean[0:self.nStates]
+                planned_cov = self.log['planning_cov'][i]
+                planned_agent_cov = planned_cov[0:self.nStates - 1, 0:self.nStates - 1]
+                planned_p_agent = self.generate_cov_ellipse(planned_agent_mean, planned_agent_cov, alpha=1)
+                agent_plan_ellipse.set_offsets(np.array([planned_p_agent[0, :], planned_p_agent[1, :]]).T)
+
+            # visualize landmark mean and covariance
+            for id in range(self.nLandmark):
+                landmark_ellipses[id].set_offsets(np.array([[], []]).T)
+
+            for id in range(self.nLandmark):
+                if mean[2 + 2 * id + 1] == 0:
+                    pass
+                else:
+                    landmark_mean = mean[2 + 2 * id + 1: 2 + 2 * id + 2 + 1]
+                    landmark_cov = cov[2 + 2 * id + 1: 2 + 2 * id + 2 + 1, 2 + 2 * id + 1: 2 + 2 * id + 2 + 1]
+                    p_landmark = self.generate_landmark_ellipse(landmark_mean, landmark_cov)
+                    landmark_ellipses[id].set_offsets(np.array([p_landmark[0, :], p_landmark[1, :]]).T)
+
+            # clear observation model visualization
+            for point in sensor_points:
+                point[0].set_xdata([])
+                point[0].set_ydata([])
+
+            # observation model visualization
+            for observation in self.log['observations'][i]:
+                id = int(observation[0])
+                measurement = observation[1:]
+                loc_x = xt_true[i, 0] + measurement[0] * cos(xt_true[i, 2] + measurement[1])
+                loc_y = xt_true[i, 1] + measurement[0] * sin(xt_true[i, 2] + measurement[1])
+                sensor_points[id][0].set_xdata([xt_true[i, 0], loc_x])
+                sensor_points[id][0].set_ydata([xt_true[i, 1], loc_y])
+
+            # visualize path statistics
+            path_true = xt_true[:i+1, self.model_true.explr_idx]
+            ck_true = convert_traj2ck(self.erg_ctrl_true.basis, path_true)
+            val_true = convert_ck2dist(self.erg_ctrl_true.basis, ck_true, size=self.size)
+            ax2.cla()
+            ax2.contourf(*xy, val_true.reshape(50, 50), levels=20)
+
+            # visualize path statistics
+            path_est = xt_est[:i+1, self.model_dr.explr_idx]
+            ck_est = convert_traj2ck(self.erg_ctrl_dr.basis, path_est)
+            val_est = convert_ck2dist(self.erg_ctrl_dr.basis, ck_est, size=self.size)
+            ax3.cla()
+            ax3.contourf(*xy, val_est.reshape(50, 50), levels=20)
+
+            # return matplotlib objects for animation
+            # ret = [points_true, points_dr, agent_ellipse, points_est]
+            ret = [points_true, agent_ellipse, points_est, agent_true, agent_est, agent_plan_ellipse, agent_plan, points_plan]
+            for item in sensor_points:
+                ret.append(item[0])
+            for item in landmark_ellipses:
+                ret.append(item)
+            return ret
+
+        anim = animation.FuncAnimation(fig, sub_animate, frames=self.tf, interval=(1000 / rate))
         if save is not None:
             Writer = animation.writers['ffmpeg']
             writer = Writer(fps=40, metadata=dict(artist='simulation_slam'), bitrate=5000)
