@@ -6,6 +6,7 @@ from tqdm import tqdm
 from numpy import sin, cos, sqrt
 import math
 from math import pi
+from tempfile import TemporaryFile
 
 
 class simulation_slam():
@@ -113,7 +114,11 @@ class simulation_slam():
             #########################
             # Information for debug
             #########################
-            print("robot uncertainty: ", np.linalg.det(cov[0: self.nStates, 0: self.nStates]))
+            # print("robot uncertainty: ", np.linalg.det(cov[0: self.nStates, 0: self.nStates]))
+            if t == 200:
+                np.save("/home/msun/Code/ErgodicBSP/test/mean_mat", mean)
+                np.save("/home/msun/Code/ErgodicBSP/test/cov_mat", cov)
+                print("data written success !")
 
         print("simulation finished.")
 

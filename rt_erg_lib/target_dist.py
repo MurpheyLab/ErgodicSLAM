@@ -27,7 +27,7 @@ class TargetDist(object):
         self.means = means
         self.vars  = vars
 
-        print("means: ", self.means)
+        # print("means: ", self.means)
 
         self.has_update = False
         self.grid_vals = self.__call__(self.grid)

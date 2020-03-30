@@ -21,7 +21,7 @@ modelTrue = IntegratorSE2(size=size)
 envDR = IntegratorSE2(size=size)
 modelDR = IntegratorSE2(size=size)
 
-means = [np.array([14.5, 5.5]), np.array([6.5, 15.5])]
+means = [np.array([10.5, 1.5]), np.array([6.5, 15.5])]
 # means = [np.array([10.5, 5.5]), np.array([10.5, 15.5])]
 vars = [np.array([1.2, 1.2])**2, np.array([1.2, 1.2])**2]
 t_dist = TargetDist(num_pts=50, means=means, vars=vars, size=size)
