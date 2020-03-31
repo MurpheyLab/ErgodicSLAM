@@ -22,8 +22,8 @@ envDR = IntegratorSE2(size=size)
 modelDR = IntegratorSE2(size=size)
 
 means = [np.array([10.5, 1.5]), np.array([6.5, 15.5])]
-# means = [np.array([10.5, 5.5]), np.array([10.5, 15.5])]
-vars = [np.array([1.2, 1.2])**2, np.array([1.2, 1.2])**2]
+# vars = [np.array([1.2, 1.2])**2, np.array([1.2, 1.2])**2]
+vars = [np.array([0.2, 0.2])**2, np.array([0.2, 0.2])**2]
 t_dist = TargetDist(num_pts=50, means=means, vars=vars, size=size)
 
 ergCtrlTrue = RTErgodicControl(modelTrue, t_dist, horizon=100, num_basis=15, batch_size=200)
@@ -32,7 +32,7 @@ ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=100, num_basis=15, batch_s
 ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
 """start simulation"""
-tf = 2000
+tf = 700
 # lanmark distribution 1: uniform
 # landmarks1 = np.random.uniform(0.5, 19.5, size=(10, 2))
 # landmarks2 = np.random.uniform(0.5, 19.5, size=(10, 2))

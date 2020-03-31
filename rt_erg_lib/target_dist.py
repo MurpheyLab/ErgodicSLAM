@@ -48,7 +48,7 @@ class TargetDist(object):
         val = np.zeros(x.shape[0])
         for m, v in zip(self.means, self.vars):
             innerds = np.sum((x-m)**2 / v, 1)
-            val += np.exp(-innerds/2.0)# / np.sqrt((2*np.pi)**2 * np.prod(v))
+            val += np.exp(-innerds/2.0) / np.sqrt((2*np.pi)**2 * np.prod(v))
         # normalizes the distribution
         val /= np.sum(val)
         return val

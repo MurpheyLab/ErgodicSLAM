@@ -8,14 +8,16 @@ from numpy import sin, cos, sqrt
 import math
 from math import pi
 from tempfile import TemporaryFile
+import copy
 
 
 class simulation_slam():
     def __init__(self, size, init_state, t_dist, model_true, erg_ctrl_true, env_true, model_dr, erg_ctrl_dr, env_dr, tf,
-                 landmarks, sensor_range, motion_noise, measure_noise, target_traj):
+                 landmarks, sensor_range, motion_noise, measure_noise):
         self.size = size
         self.init_state = init_state
         self.tf = tf
+        self.init_t_dist = copy.copy(t_dist)
         self.t_dist = t_dist
         self.exec_times = np.zeros(tf)
         self.landmarks = landmarks
@@ -35,7 +37,6 @@ class simulation_slam():
         self.Q = np.diag(measure_noise) ** 2
         self.observed_landmarks = np.zeros(self.landmarks.shape[0])
         self.threshold = 99999999
-        self.target_traj = target_traj
 
     def start(self, report=False, debug=False):
         #########################
@@ -57,7 +58,7 @@ class simulation_slam():
         # simulation loop
         ##########################
         self.log = {'trajectory_true': [], 'trajectory_dr': [], 'true_landmarks': [], 'observations': [], 'mean': [],
-                    'covariance': [], 'planning_mean': [], 'planning_cov': [], 'target_dist':[]}
+                    'covariance': [], 'planning_mean': [], 'planning_cov': [], 'target_dist': []}
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
@@ -65,12 +66,20 @@ class simulation_slam():
             #########################
             # update target distribution and ergodic controller
             #########################
-            means = [self.target_traj[t]]
-            vars = [np.array([1.2, 1.2]) ** 2]
-            size = 20
-            t_dist = TargetDist(num_pts=50, means=means, vars=vars, size=size)
-            self.erg_ctrl_dr.target_dist = t_dist
-            self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, t_dist.grid_vals, t_dist.grid)
+            # p = np.linalg.det(cov[0: self.nStates, 0: self.nStates])
+            # threshold = 1e-05
+            # if p < threshold:
+            #     print("pass")
+            #     pass
+            # else:
+            #     print("update target distribution")
+            #     self.erg_ctrl_dr.target_dist.update(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov)
+            #     self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals, self.erg_ctrl_dr.target_dist.grid)
+
+            self.erg_ctrl_dr.target_dist.update2(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov)
+            self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals,
+                                                     self.erg_ctrl_dr.target_dist.grid)
+            t_dist = copy.copy(self.erg_ctrl_dr.target_dist)
             self.log['target_dist'].append(t_dist)
 
             #########################
@@ -309,7 +318,7 @@ class simulation_slam():
         return p
 
     def plot(self, point_size=1, save=None):
-        [xy, vals] = self.t_dist.get_grid_spec()
+        [xy, vals] = self.init_t_dist.get_grid_spec()
         plt.contourf(*xy, vals, levels=20)
 
         xt_true = np.stack(self.log['trajectory_true'])
@@ -330,7 +339,7 @@ class simulation_slam():
         # return plt.gcf()
 
     def animate(self, point_size=1, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
-        [xy, vals] = self.t_dist.get_grid_spec()
+        [xy, vals] = self.init_t_dist.get_grid_spec()
         plt.contourf(*xy, vals, levels=20)
         plt.scatter(self.landmarks[:, 0], self.landmarks[:, 1], color='white', marker='P')
         ax = plt.gca()
@@ -457,7 +466,7 @@ class simulation_slam():
         fig = plt.gcf()
 
         ax1 = fig.add_subplot(131)
-        [xy, vals] = self.t_dist.get_grid_spec()
+        [xy, vals] = self.init_t_dist.get_grid_spec()
         ax1.contourf(*xy, vals, levels=20)
         ax1.scatter(self.landmarks[:, 0], self.landmarks[:, 1], color='white', marker='P')
         ax1.set_aspect('equal', 'box')
@@ -469,7 +478,7 @@ class simulation_slam():
 
         ax3 = fig.add_subplot(133)
         ax3.set_aspect('equal', 'box')
-        ax3.set_title('Estimated Path Statistics')
+        ax3.set_title('Target Distribution')
 
         xt_true = np.stack(self.log['trajectory_true'])
         points_true = ax1.scatter([], [], s=point_size, color='red')
@@ -568,19 +577,20 @@ class simulation_slam():
                 sensor_points[id][0].set_xdata([xt_true[i, 0], loc_x])
                 sensor_points[id][0].set_ydata([xt_true[i, 1], loc_y])
 
-            # visualize path statistics
+            # visualize true path statistics
             path_true = xt_true[:i+1, self.model_true.explr_idx]
             ck_true = convert_traj2ck(self.erg_ctrl_true.basis, path_true)
             val_true = convert_ck2dist(self.erg_ctrl_true.basis, ck_true, size=self.size)
             ax2.cla()
+            ax2.set_title('Actual Path Statistics')
             ax2.contourf(*xy, val_true.reshape(50, 50), levels=20)
 
-            # visualize path statistics
-            path_est = xt_est[:i+1, self.model_dr.explr_idx]
-            ck_est = convert_traj2ck(self.erg_ctrl_dr.basis, path_est)
-            val_est = convert_ck2dist(self.erg_ctrl_dr.basis, ck_est, size=self.size)
+            # visualize target distribution
+            t_dist = self.log['target_dist'][i]
+            xy3, vals = t_dist.get_grid_spec()
             ax3.cla()
-            ax3.contourf(*xy, val_est.reshape(50, 50), levels=20)
+            ax3.set_title('Target Distribution')
+            ax3.contourf(*xy3, vals, levels=20)
 
             # return matplotlib objects for animation
             # ret = [points_true, points_dr, agent_ellipse, points_est]
@@ -600,7 +610,7 @@ class simulation_slam():
         # return anim
 
     def path_reconstruct(self, save=None):
-        xy, vals = self.t_dist.get_grid_spec()
+        xy, vals = self.init_t_dist.get_grid_spec()
 
         path_true = np.stack(self.log['trajectory_true'])[:self.tf, self.model_true.explr_idx]
         ck_true = convert_traj2ck(self.erg_ctrl_true.basis, path_true)
