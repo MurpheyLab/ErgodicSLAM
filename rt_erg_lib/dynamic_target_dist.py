@@ -114,7 +114,8 @@ class TargetDist(object):
         if np.sum(vals) != 0:
             vals /= np.sum(vals)
 
-        threshold = 1e-03
+        # threshold = 1e-03
+        threshold = 4e-04
         alpha = (p / (p + threshold)) ** 2
         print("alpha: ", alpha)
         self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals

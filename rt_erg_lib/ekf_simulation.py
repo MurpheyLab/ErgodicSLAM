@@ -115,10 +115,10 @@ class simulation_slam():
             # Information for debug
             #########################
             # print("robot uncertainty: ", np.linalg.det(cov[0: self.nStates, 0: self.nStates]))
-            if t == 800:
-                np.save("/home/msun/Code/ErgodicBSP/test/mean_mat", mean)
-                np.save("/home/msun/Code/ErgodicBSP/test/cov_mat", cov)
-                print("data written success !")
+            # if t == 800:
+            #     np.save("/home/msun/Code/ErgodicBSP/test/mean_mat", mean)
+            #     np.save("/home/msun/Code/ErgodicBSP/test/cov_mat", cov)
+            #     print("data written success !")
 
         print("simulation finished.")
 
@@ -361,8 +361,8 @@ class simulation_slam():
 
         def sub_animate(i):
             # for debug: save frame
-            if i == 800:
-                plt.savefig('frame-1200.png')
+            # if i == 800:
+            #     plt.savefig('frame-1200.png')
 
             # visualize agent location / trajectory
             if (show_traj):

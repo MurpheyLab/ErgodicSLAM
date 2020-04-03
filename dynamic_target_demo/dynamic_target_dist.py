@@ -39,8 +39,8 @@ ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid
 # initialize user-defined landmarks
 # landmarks = np.array([[14.3, 5.5],
 #                       [13.9, 5.9]])
-landmarks = np.array([[9.5, 10.5],
-                      [10.5, 9.5]])
+# landmarks = np.array([[9.5, 10.5],
+#                       [10.5, 9.5]])
 
 # lanmark distribution 1: uniform
 # landmarks1 = np.random.uniform(0.5, 19.5, size=(15, 2))
@@ -48,17 +48,21 @@ landmarks = np.array([[9.5, 10.5],
 # landmarks = np.concatenate((landmarks1, landmarks2))
 
 # lanmark distribution 2: gathered at two corners
-landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
-landmarks2 = np.random.uniform(2.0, 8.0, size=(10, 2))
-landmarks = np.concatenate((np.concatenate((landmarks1, landmarks2)), landmarks))
+# landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
+# landmarks2 = np.random.uniform(2.0, 8.0, size=(10, 2))
+# landmarks = np.concatenate((np.concatenate((landmarks1, landmarks2)), landmarks))
 
 # lanmark distribution 3: mixed distribution
 # landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
 # landmarks2 = np.random.uniform(0.5, 19.5, size=(10, 2))
 # landmarks = np.concatenate((landmarks1, landmarks2))
 
+# read landmarks from file
+landmarks = np.load('/home/msun/Code/ErgodicBSP/dynamic_target_demo/landmarks.npy')
+
 sensor_range = 4
 motion_noise = np.array([0.3, 0.2, 0.1]) ** 2
+# motion_noise = np.array([0.35, 0.25, 0.15]) ** 2
 # motion_noise = np.zeros(3)
 measure_noise = np.array([0.15, 0.15]) ** 2
 # measure_noise = np.array([1e-03, 1e-03]) ** 2
