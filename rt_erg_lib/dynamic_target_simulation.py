@@ -69,17 +69,19 @@ class simulation_slam():
             # update target distribution and ergodic controller
             #########################
             # update target distribution with different update schemes
-            if update == 1:
-                self.erg_ctrl_dr.target_dist.update1(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
-            if update == 2:
-                self.erg_ctrl_dr.target_dist.update2(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, self.mcov_inv, threshold=update_threshold)
-            if update == 3:
-                self.erg_ctrl_dr.target_dist.update3(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
-            if update == 4:
-                self.erg_ctrl_dr.target_dist.update4(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
-            # update phi for ergodic controller
-            self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals,
-                                                     self.erg_ctrl_dr.target_dist.grid)
+            if update == 0:
+                pass
+            else:
+                if update == 1:
+                    self.erg_ctrl_dr.target_dist.update1(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+                if update == 2:
+                    self.erg_ctrl_dr.target_dist.update2(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, self.mcov_inv, threshold=update_threshold)
+                if update == 3:
+                    self.erg_ctrl_dr.target_dist.update3(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+                if update == 4:
+                    self.erg_ctrl_dr.target_dist.update4(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+                # update phi for ergodic controller
+                self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals, self.erg_ctrl_dr.target_dist.grid)
             # record target distribution for replay and visualization
             t_dist = copy.copy(self.erg_ctrl_dr.target_dist)
             self.log['target_dist'].append(t_dist)

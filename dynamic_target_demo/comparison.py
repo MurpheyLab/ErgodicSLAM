@@ -8,7 +8,7 @@ from rt_erg_lib.integrator_se2 import IntegratorSE2
 from rt_erg_lib.ergodic_control import RTErgodicControl
 from rt_erg_lib.dynamic_target_dist import TargetDist
 from rt_erg_lib.utils import *
-from rt_erg_lib.ekf_simulation import simulation_slam
+from rt_erg_lib.dynamic_target_simulation import simulation_slam
 import autograd.numpy as np
 from math import sin, cos
 from math import pi
@@ -67,7 +67,7 @@ motion_noise = np.array([0.3, 0.2, 0.1]) ** 2
 measure_noise = np.array([0.15, 0.15]) ** 2
 # measure_noise = np.array([1e-03, 1e-03]) ** 2
 erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise)
-erg_ctrl_sim.start(report=True, debug=False)
-erg_ctrl_sim.animate(point_size=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
+erg_ctrl_sim.start(report=True, debug=False, update=0)
+erg_ctrl_sim.animate3(point_size=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
 erg_ctrl_sim.plot(point_size=1, save=None)
 erg_ctrl_sim.path_reconstruct(save=None)
