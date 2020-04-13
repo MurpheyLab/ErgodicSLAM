@@ -1,6 +1,7 @@
 import autograd.numpy as np
 from math import pi, sqrt
 from matplotlib import pyplot as plt
+from time import time
 
 
 means = np.load("/home/msun/Code/ErgodicBSP/test/mean_mat.npy")
@@ -32,16 +33,15 @@ for i in range(nLandmark):
     else:
         observed_table[i] = 1
     vars.append(var)
-    print(var)
 # vars = np.array(vars)
 
+start_time = time()
 vals = np.zeros(grid.shape[0])
 for i in range(grid.shape[0]):
     for j in range(nLandmark):
         if observed_table[j] == 1:
             x = grid[i, :]
             mean = means[2 + 2 * j + 1: 2 + 2 * j + 3]
-            print("mean: ", mean)
             var = vars[j]
             p = multi_gaussian(x, mean, var)
             vals[i] += p
@@ -49,6 +49,8 @@ for i in range(grid.shape[0]):
             pass
 vals = np.array(vals)
 vals /= np.sum(vals)
+print('time: ', time()-start_time)
+
 
 xy = []
 for g in grid.T:
@@ -57,12 +59,9 @@ for g in grid.T:
     )
 grid_vals = vals.reshape(num_pts, num_pts)
 
-for i in range(5):
-    for j in range(5):
-        print(grid_vals[20 + i, 20 + j])
 
 fig = plt.figure()
 ax = fig.gca()
 ax.set_aspect('equal', 'box')
-ax.contourf(*xy, grid_vals, levels=20)
+ax.contourf(*xy, grid_vals, levels=30)
 plt.show()

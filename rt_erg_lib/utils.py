@@ -1,5 +1,5 @@
 import numpy as np
-from math import pi
+from math import pi, sqrt
 
 def convert_phi2phik(basis, phi_val, phi_grid=None):
     '''
@@ -64,3 +64,46 @@ def normalize_angle(angle):
         normAngle += 2*pi
 
     return normAngle
+
+def multi_gaussian(x, mean, var):
+    p = 1 / np.sqrt(np.linalg.det(2 * pi * var)) * np.exp(
+                    -0.5 * np.dot(np.dot((x - mean).T, np.linalg.inv(var)), (x - mean)))
+    return p
+
+def derivative_measure(x, alpha):
+    '''
+    @x: robot state (x1, x2, theta)
+    @alpha: landmark state (alpha1, alpha2)
+    '''
+    dm = np.zeros((2,2))
+    dm[0,0] = 0.5 / sqrt((alpha[0]-x[0])**2 + (alpha[1]-x[1])**2) * 2 * (alpha[0]-x[0])
+    dm[0,1] = 0.5 / sqrt((alpha[0]-x[0])**2 + (alpha[1]-x[1])**2) * 2 * (alpha[1]-x[1])
+    dm[1,0] = -1 / ( 1 + (alpha[1]-x[1])**2 / (alpha[0]-x[0])**2 ) * (alpha[1]-x[1]) /         (alpha[0]-x[0])**2
+    dm[1,1] = 1 / ( 1 + (alpha[1]-x[1])**2 / (alpha[0]-x[0])**2 ) * (1) / (alpha[0]-x[0])
+    return dm
+
+def fisher_mat(x, alpha, cov_inv):
+    '''
+    @cov_inv: inverse of measurement noise covariance matrix
+    '''
+    dist = sqrt( (x[0]-alpha[0])**2 + (x[1]-alpha[1])**2 )
+    if dist > 4:
+        return np.zeros((2,2))
+    else:
+        dm = derivative_measure(x, alpha)
+        return np.dot(np.dot(dm.T, cov_inv), dm)
+
+def fisher_mat_expectation(x, alpha, cov_inv):
+    '''
+    @cov_inv: inverse of measurement noise covariance matrix
+    '''
+    dm = derivative_measure(x, alpha)
+    return np.dot(np.dot(dm.T, cov_inv), dm)
+
+def sample_expectation(rv, mean, cov, num=1000):
+    val = 0
+    sx, sy = np.random.multivariate_normal(mean, cov, num).T
+    for i in range(sx.shape[0]):
+        val += rv(sx[i], sy[i])
+    val /= num
+    return val

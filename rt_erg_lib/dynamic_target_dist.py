@@ -3,6 +3,7 @@
 import numpy as np
 import numpy.random as npr
 from math import pi
+from .utils import *
 
 
 class TargetDist(object):
@@ -64,7 +65,7 @@ class TargetDist(object):
             -0.5 * np.dot(np.dot((x - mean).T, np.linalg.inv(var)), (x - mean)))
         return p
 
-    def update1(self, nStates, nLandmark, observed_table, belief_means, belief_vars):
+    def update0(self, nStates, nLandmark, observed_table, belief_means, belief_vars):
         p = np.linalg.det(belief_vars[0: nStates, 0: nStates])
         print("p: ", p)
         threshold = 1e-05
@@ -93,9 +94,12 @@ class TargetDist(object):
             # self.grid_vals = (1 - alpha) * self.grid_vals + alpha * vals
             self.grid_vals = vals
 
-    def update2(self, nStates, nLandmark, observed_table, belief_means, belief_vars):
+    def update1(self, nStates, nLandmark, observed_table, belief_means, belief_vars, threshold=1e-3):
+        '''
+        intuitive update: using landmark uncertainty directly
+        '''
         p = np.linalg.det(belief_vars[0: nStates, 0: nStates])
-        print("\np: ", p)
+        # print("\np: ", p)
 
         temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts) for _ in range(2)])
         grid = np.c_[temp_grid[0].ravel(), temp_grid[1].ravel()]
@@ -115,7 +119,132 @@ class TargetDist(object):
             vals /= np.sum(vals)
 
         # threshold = 1e-03
-        threshold = 4e-04
+        # threshold = 4e-04
         alpha = (p / (p + threshold)) ** 2
-        print("alpha: ", alpha)
+        # print("alpha: ", alpha)
+        self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals
+
+    def update2(self, nStates, nLandmark, observed_table, belief_means, belief_cov, mcov_inv, threshold=1e-3):
+        '''
+        update using fisher information matrix approximated at mean
+        '''
+        p = np.linalg.det(belief_cov[0: nStates, 0: nStates])
+        # print("\np: ", p)
+
+        temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts) for _ in range(2)])
+        grid = np.c_[temp_grid[0].ravel(), temp_grid[1].ravel()]
+
+        lm_cov_table = []
+        for i in range(nLandmark):
+            if observed_table[i] == 1:
+                lm = belief_means[2 + 2*i + 1: 2 + 2*i + 3]
+                cov = belief_cov[2+2*i+1:2+2*i+3, 2+2*i+1:2+2*i+3]
+                lm_cov_table.append(multi_gaussian(lm, lm, cov))
+            else:
+                lm_cov_table.append(0)
+
+        vals = np.zeros(grid.shape[0])
+        for i in range(grid.shape[0]):
+            x = grid[i,:]
+            fisher_mat_val = 0
+            # subfunc = lambda lm1, lm2: fisher_mat(x, [lm1, lm2], mcov_inv)
+            for j in range(nLandmark):
+                if observed_table[j] == 1:
+                    lm = belief_means[2 + 2*j + 1: 2 + 2*j + 3]
+                    cov = belief_cov[2+2*j+1:2+2*j+3, 2+2*j+1:2+2*j+3]
+                    mat = fisher_mat(x, lm, mcov_inv) * lm_cov_table[j]
+                else:
+                    mat = np.zeros((nStates-1, nStates-1))
+                fisher_mat_val += np.linalg.det(mat)
+            vals[i] = fisher_mat_val
+        vals = np.array(vals)
+        if np.sum(vals) != 0:
+            vals /= np.sum(vals)
+
+        # threshold = 1e-03
+        # threshold = 4e-04
+        alpha = (p / (p + threshold)) ** 2
+        # print("alpha: ", alpha)
+        self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals
+
+    def update3(self, nStates, nLandmark, observed_table, belief_means, belief_cov, threshold=1e-3):
+        '''
+        update using uncertainty distance field (sum)
+        '''
+        p = np.linalg.det(belief_cov[0: nStates, 0: nStates])
+        # print("\np: ", p)
+
+        temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts) for _ in range(2)])
+        grid = np.c_[temp_grid[0].ravel(), temp_grid[1].ravel()]
+
+        lm_det_table = []
+        for i in range(nLandmark):
+            if observed_table[i] == 1:
+                lm = belief_means[2 + 2*i + 1: 2 + 2*i + 3]
+                cov = belief_cov[2+2*i+1:2+2*i+3, 2+2*i+1:2+2*i+3]
+                lm_det_table.append(np.linalg.det(cov))
+            else:
+                lm_det_table.append(0)
+
+        vals = np.zeros(grid.shape[0])
+        for i in range(grid.shape[0]):
+            x = grid[i,:]
+            for j in range(nLandmark):
+                if observed_table[j] == 1:
+                    lm = belief_means[2 + 2*j + 1: 2 + 2*j + 3]
+                    cov = belief_cov[2+2*j+1:2+2*j+3, 2+2*j+1:2+2*j+3]
+                    dist_val = 1 / ( sqrt( (x[0]-lm[0])**2 + (x[1]-lm[1])**2 ) * lm_det_table[j] )
+                    vals[i] += dist_val
+                else:
+                    pass
+        vals = np.array(vals)
+        if np.sum(vals) != 0:
+            vals /= np.sum(vals)
+
+        # threshold = 1e-03
+        # threshold = 4e-04
+        alpha = (p / (p + threshold)) ** 2
+        # print("alpha: ", alpha)
+        self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals
+
+    def update4(self, nStates, nLandmark, observed_table, belief_means, belief_cov, threshold=1e-3):
+        '''
+        update using uncertainty distance field (max)
+        '''
+        p = np.linalg.det(belief_cov[0: nStates, 0: nStates])
+        # print("\np: ", p)
+
+        temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts) for _ in range(2)])
+        grid = np.c_[temp_grid[0].ravel(), temp_grid[1].ravel()]
+
+        lm_det_table = []
+        for i in range(nLandmark):
+            if observed_table[i] == 1:
+                lm = belief_means[2 + 2*i + 1: 2 + 2*i + 3]
+                cov = belief_cov[2+2*i+1:2+2*i+3, 2+2*i+1:2+2*i+3]
+                lm_det_table.append(np.linalg.det(cov))
+            else:
+                lm_det_table.append(0)
+
+        vals = np.zeros(grid.shape[0])
+        for i in range(grid.shape[0]):
+            x = grid[i,:]
+            dist_vals = []
+            for j in range(nLandmark):
+                if observed_table[j] == 1:
+                    lm = belief_means[2 + 2*j + 1: 2 + 2*j + 3]
+                    cov = belief_cov[2+2*j+1:2+2*j+3, 2+2*j+1:2+2*j+3]
+                    dist_val = 1 / ( sqrt( (x[0]-lm[0])**2 + (x[1]-lm[1])**2 ) * lm_det_table[j] )
+                    dist_vals.append(dist_val)
+                else:
+                    dist_vals.append(0)
+            vals[i] += max(dist_vals)
+        vals = np.array(vals)
+        if np.sum(vals) != 0:
+            vals /= np.sum(vals)
+
+        # threshold = 1e-03
+        # threshold = 4e-04
+        alpha = (p / (p + threshold)) ** 2
+        # print("alpha: ", alpha)
         self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals

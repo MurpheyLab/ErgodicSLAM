@@ -35,10 +35,11 @@ class simulation_slam():
         self.R = np.diag(motion_noise) ** 2
         self.measure_noise = measure_noise
         self.Q = np.diag(measure_noise) ** 2
+        self.mcov_inv = np.linalg.inv(self.Q)
         self.observed_landmarks = np.zeros(self.landmarks.shape[0])
         self.threshold = 99999999
 
-    def start(self, report=False, debug=False):
+    def start(self, report=False, debug=False, update=1, update_threshold=1e-3):
         #########################
         # initialize mean and covariance matrix
         #########################
@@ -62,23 +63,24 @@ class simulation_slam():
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
+        print('update mechanism: ', update)
         for t in tqdm(range(self.tf)):
             #########################
             # update target distribution and ergodic controller
             #########################
-            # p = np.linalg.det(cov[0: self.nStates, 0: self.nStates])
-            # threshold = 1e-05
-            # if p < threshold:
-            #     print("pass")
-            #     pass
-            # else:
-            #     print("update target distribution")
-            #     self.erg_ctrl_dr.target_dist.update(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov)
-            #     self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals, self.erg_ctrl_dr.target_dist.grid)
-
-            self.erg_ctrl_dr.target_dist.update2(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov)
+            # update target distribution with different update schemes
+            if update == 1:
+                self.erg_ctrl_dr.target_dist.update1(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+            if update == 2:
+                self.erg_ctrl_dr.target_dist.update2(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, self.mcov_inv, threshold=update_threshold)
+            if update == 3:
+                self.erg_ctrl_dr.target_dist.update3(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+            if update == 4:
+                self.erg_ctrl_dr.target_dist.update4(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+            # update phi for ergodic controller
             self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals,
                                                      self.erg_ctrl_dr.target_dist.grid)
+            # record target distribution for replay and visualization
             t_dist = copy.copy(self.erg_ctrl_dr.target_dist)
             self.log['target_dist'].append(t_dist)
 
