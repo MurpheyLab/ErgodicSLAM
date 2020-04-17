@@ -5,7 +5,7 @@ Testing EKF-SLAM simulation
 import sys
 sys.path.append("/home/msun/Code/ErgodicBSP")
 from rt_erg_lib.integrator_se2 import IntegratorSE2
-from rt_erg_lib.ergodic_control import RTErgodicControl
+from rt_erg_lib.dynamic_ergodic_control import RTErgodicControl
 from rt_erg_lib.dynamic_target_dist import TargetDist
 from rt_erg_lib.utils import *
 from rt_erg_lib.dynamic_target_simulation import simulation_slam
@@ -68,6 +68,6 @@ measure_noise = np.array([0.15, 0.15]) ** 2
 # measure_noise = np.array([1e-03, 1e-03]) ** 2
 erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise)
 erg_ctrl_sim.start(report=True, debug=False, update=2, update_threshold=1e-3)
-erg_ctrl_sim.animate3(point_size=1, alpha=3, show_traj=True, title='Landmarks Distribution Test', rate=50)
+erg_ctrl_sim.animate3(point_size=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
 erg_ctrl_sim.plot(point_size=1, save=None)
 erg_ctrl_sim.path_reconstruct(save=None)

@@ -31,6 +31,7 @@ class RTErgodicControl(object):
 
         self._phik = None
         self.ck = None
+        self.init_phik = None
 
     def reset(self):
         self.u_seq = [0.0*self.model.action_space.sample()
@@ -86,7 +87,7 @@ class RTErgodicControl(object):
         if ck_list is not None:
             ck_list[agent_num] = ck
             ck = np.mean(ck_list, axis=0)
-                
+
         fourier_diff = self.lamk * (ck - self.phik)
         fourier_diff = fourier_diff.reshape(-1,1)
 

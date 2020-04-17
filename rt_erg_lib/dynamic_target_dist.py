@@ -87,7 +87,11 @@ class TargetDist(object):
                         vals[i] += p
                     else:
                         pass
-            vals /= np.sum(vals)
+            if np.sum(vals) != 0:
+                vals /= np.sum(vals)
+            # else:
+            #    vals = np.ones(grid.shape[0])
+
 
             print("replanning")
             alpha = p / (p + threshold)
@@ -117,6 +121,8 @@ class TargetDist(object):
                     pass
         if np.sum(vals) != 0:
             vals /= np.sum(vals)
+        # else:
+        #     vals = np.ones(grid.shape[0])
 
         # threshold = 1e-03
         # threshold = 4e-04
@@ -160,12 +166,15 @@ class TargetDist(object):
         vals = np.array(vals)
         if np.sum(vals) != 0:
             vals /= np.sum(vals)
+        # else:
+        #     vals = np.ones(grid.shape[0])
 
         # threshold = 1e-03
         # threshold = 4e-04
         alpha = (p / (p + threshold)) ** 2
         # print("alpha: ", alpha)
         self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals
+        self.grid_vals /= np.sum(self.grid_vals)
 
     def update3(self, nStates, nLandmark, observed_table, belief_means, belief_cov, threshold=1e-3):
         '''
@@ -200,6 +209,8 @@ class TargetDist(object):
         vals = np.array(vals)
         if np.sum(vals) != 0:
             vals /= np.sum(vals)
+        # else:
+        #     vals = np.ones(grid.shape[0])
 
         # threshold = 1e-03
         # threshold = 4e-04
@@ -242,6 +253,8 @@ class TargetDist(object):
         vals = np.array(vals)
         if np.sum(vals) != 0:
             vals /= np.sum(vals)
+        # else:
+        #     vals = np.ones(grid.shape[0])
 
         # threshold = 1e-03
         # threshold = 4e-04

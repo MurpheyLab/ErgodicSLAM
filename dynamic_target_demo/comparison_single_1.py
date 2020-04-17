@@ -14,7 +14,7 @@ from math import sin, cos
 from math import pi
 
 """initialization"""
-tf = 1000
+tf = 2000
 size = 20.0
 # size = 25.0
 noise = 0.005
@@ -67,7 +67,8 @@ motion_noise = np.array([0.3, 0.2, 0.1]) ** 2
 measure_noise = np.array([0.15, 0.15]) ** 2
 # measure_noise = np.array([1e-03, 1e-03]) ** 2
 erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise)
-erg_ctrl_sim.start(report=True, debug=False, update=4, update_threshold=5e-4)
-erg_ctrl_sim.animate3(point_size=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
+erg_ctrl_sim.start(report=True, debug=False, update=0)
+# erg_ctrl_sim.animate3(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
+erg_ctrl_sim.animate(point_size=2, alpha=4, show_traj=True, title='Landmarks Distribution Test', rate=50)
 erg_ctrl_sim.plot(point_size=1, save=None)
 erg_ctrl_sim.path_reconstruct(save=None)

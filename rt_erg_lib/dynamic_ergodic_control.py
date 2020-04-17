@@ -67,7 +67,7 @@ class RTErgodicControl(object):
             fdx.append(self.model.fdx(x, self.u_seq[t]))
             fdu.append(self.model.fdu(x))
             dbar.append(self.barr.dx(x[self.model.explr_idx]))
-            # step the model forwards
+            # step the model forwards (and incorporate uncertainty prediction)
             x = self.model.step(self.u_seq[t] * 0.)
 
         # sample any past experiences
@@ -86,7 +86,7 @@ class RTErgodicControl(object):
         if ck_list is not None:
             ck_list[agent_num] = ck
             ck = np.mean(ck_list, axis=0)
-                
+
         fourier_diff = self.lamk * (ck - self.phik)
         fourier_diff = fourier_diff.reshape(-1,1)
 
