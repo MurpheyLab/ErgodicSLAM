@@ -1,5 +1,7 @@
 import numpy as np
-from math import pi, sqrt
+from math import pi
+from numpy import sqrt
+import matplotlib.pyplot as plt
 
 def convert_phi2phik(basis, phi_val, phi_grid=None):
     '''
@@ -78,7 +80,7 @@ def derivative_measure(x, alpha):
     dm = np.zeros((2,2))
     dm[0,0] = 0.5 / sqrt((alpha[0]-x[0])**2 + (alpha[1]-x[1])**2) * 2 * (alpha[0]-x[0])
     dm[0,1] = 0.5 / sqrt((alpha[0]-x[0])**2 + (alpha[1]-x[1])**2) * 2 * (alpha[1]-x[1])
-    dm[1,0] = -1 / ( 1 + (alpha[1]-x[1])**2 / (alpha[0]-x[0])**2 ) * (alpha[1]-x[1]) /         (alpha[0]-x[0])**2
+    dm[1,0] = -1 / ( 1 + (alpha[1]-x[1])**2 / (alpha[0]-x[0])**2 ) * (alpha[1]-x[1]) / (alpha[0]-x[0])**2
     dm[1,1] = 1 / ( 1 + (alpha[1]-x[1])**2 / (alpha[0]-x[0])**2 ) * (1) / (alpha[0]-x[0])
     return dm
 
@@ -92,6 +94,31 @@ def fisher_mat(x, alpha, cov_inv):
     else:
         dm = derivative_measure(x, alpha)
         return np.dot(np.dot(dm.T, cov_inv), dm)
+
+def fisher_mat_broadcast(x, alpha, cov_inv):
+    '''
+    calculate FIM by broadcasting
+    @x: N-by-2 array contain all grids
+    '''
+    # calculate derivative of measurement model
+    dm1 = 0.5 / sqrt( (-x[:,0]+alpha[0])**2 + (-x[:,1]+alpha[1])**2 ) * 2 * (-x[:,0] + alpha[0])
+    dm2 = 0.5 / sqrt( (-x[:,0]+alpha[0])**2 + (-x[:,1]+alpha[1])**2 ) * 2 * (-x[:,1] + alpha[1])
+    dm3 = -1 / ( 1 + (-x[:,1]+alpha[1])**2 / (-x[:,0]+alpha[0])**2 ) * (-x[:,1]+alpha[1]) / (-x[:,0]+alpha[0])**2
+    dm4 = 1 / ( 1 + (-x[:,1]+alpha[1])**2 / (-x[:,0]+alpha[0])**2 ) * (1) / (-x[:,0]+alpha[0])
+    # calculate each element of FIM (4 in total)
+    fim1 = dm1 * (dm1*cov_inv[0,0] + dm3*cov_inv[1,0]) + dm3 * (dm1*cov_inv[0,1] + dm3*cov_inv[1,1])
+    fim2 = dm2 * (dm1*cov_inv[0,0] + dm3*cov_inv[1,0]) + dm4 * (dm1*cov_inv[0,1] + dm3*cov_inv[1,1])
+    fim3 = dm1 * (dm2*cov_inv[0,0] + dm4*cov_inv[1,0]) + dm3 * (dm2*cov_inv[0,1] + dm4*cov_inv[1,1])
+    fim4 = dm2 * (dm2*cov_inv[0,0] + dm4*cov_inv[1,0]) + dm4 * (dm2*cov_inv[0,1] + dm4*cov_inv[1,1])
+    # calculate determinant of each FIM
+    det = fim1 * fim3 - fim2 * fim4
+    # filter out based on dist
+    dist = (x[:,0]-alpha[0])**2 + (x[:,1]-alpha[1])**2
+    dist_flag = dist < 16
+    dist_flag = dist_flag.astype(int)
+    det = det * dist_flag
+    # return
+    return det
 
 def fisher_mat_expectation(x, alpha, cov_inv):
     '''
@@ -107,3 +134,58 @@ def sample_expectation(rv, mean, cov, num=1000):
         val += rv(sx[i], sy[i])
     val /= num
     return val
+
+def evaluation(logs, init_dist=None):
+    '''
+    automatic visualize/evaluate/compare results from different simulations
+    @logs: 1-D array containing log data returned from simulation.start() method
+    @init_dist:
+    '''
+    # initialization
+    num_sims = len(logs)
+    fig = plt.figure()
+    tf = logs[0]['tf']
+    taxis = np.arange(tf)
+    # evaluation
+    if init_dist is None:
+        # first row: comparison of ergodic cost between true trajectory and estimated trajectory for each simulation
+        axes_row_1 = []
+        for i in range(num_sims):
+            axes_row_1.append(fig.add_subplot(2, num_sims, i+1))
+            axes_row_1[i].plot(taxis, logs[i]['metric_true'], c='b')
+            axes_row_1[i].plot(taxis, logs[i]['metric_est'], c='r')
+            axes_row_1[i].set_xlabel('Time Steps')
+            axes_row_1[i].set_ylabel('Ergodic Metric')
+            axes_row_1[i].set_title('Simulation ' + str(i+1))
+            axes_row_1[i].legend(['True Trajectory', 'Estimated Trajectory'])
+
+        # second row: uncertainty plot and estimation error plot
+        axes_row_21 = fig.add_subplot(2, num_sims, num_sims+1)
+        for i in range(num_sims):
+            axes_row_21.plot(taxis, logs[i]['uncertainty'])
+        axes_row_21.set_xlabel('Time Steps')
+        axes_row_21.set_ylabel('Robot State Uncertainty')
+        axes_row_21.set_title('Robot State Uncertainty Plot')
+        axes_row_21.legend(['Simulation '+str(i+1) for i in range(num_sims)])
+
+        axes_row_22 = fig.add_subplot(2, num_sims, num_sims+2)
+        for i in range(num_sims):
+            axes_row_22.plot(taxis, logs[i]['error'])
+        axes_row_22.set_xlabel('Time Steps')
+        axes_row_22.set_ylabel('State Estimation Error')
+        axes_row_22.set_title('State Estimation Error Plot')
+        axes_row_22.legend(['Simulation '+str(i+1) for i in range(num_sims)])
+
+        axes_row_23 = fig.add_subplot(2, num_sims, num_sims+3)
+        for i in range(num_sims):
+            axes_row_23.plot(taxis, logs[i]['metric_error'])
+        axes_row_23.set_xlabel('Time Steps')
+        axes_row_23.set_ylabel('Ergodic Metric Error')
+        axes_row_23.set_title('Ergodic Metric Error Plot')
+        axes_row_23.legend(['Simulation '+str(i+1) for i in range(num_sims)])
+
+    else:
+        pass
+
+    # finally, plot all of them :)
+    plt.show()

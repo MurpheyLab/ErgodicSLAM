@@ -4,6 +4,7 @@ import numpy as np
 import numpy.random as npr
 from math import pi
 from .utils import *
+from scipy.stats import multivariate_normal
 
 
 class TargetDist(object):
@@ -107,7 +108,7 @@ class TargetDist(object):
 
         temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts) for _ in range(2)])
         grid = np.c_[temp_grid[0].ravel(), temp_grid[1].ravel()]
-
+        ''' old implementation (too slow!)
         vals = np.zeros(grid.shape[0])
         for i in range(grid.shape[0]):
             for j in range(nLandmark):
@@ -119,6 +120,17 @@ class TargetDist(object):
                     vals[i] += px
                 else:
                     pass
+        '''
+        vals = np.zeros(grid.shape[0])
+        for i in range(nLandmark):
+            if observed_table[i] == 1:
+                mean = belief_means[nStates + 2 * i: nStates + 2 * i + 2]
+                var = belief_vars[nStates + 2 * i: nStates + 2 * i + 2, nStates + 2 * i: nStates + 2 * i + 2]
+                rv = multivariate_normal(mean, var)
+                vals += rv.pdf(grid)
+            else:
+                pass
+
         if np.sum(vals) != 0:
             vals /= np.sum(vals)
         # else:
@@ -150,6 +162,7 @@ class TargetDist(object):
                 lm_cov_table.append(0)
 
         vals = np.zeros(grid.shape[0])
+        ''' old implementation (too slow !)
         for i in range(grid.shape[0]):
             x = grid[i,:]
             fisher_mat_val = 0
@@ -164,6 +177,15 @@ class TargetDist(object):
                 fisher_mat_val += np.linalg.det(mat)
             vals[i] = fisher_mat_val
         vals = np.array(vals)
+        '''
+        for i in range(nLandmark):
+            if observed_table[i] == 1:
+                lm = belief_means[2 + 2*i + 1 : 2 + 2*i + 3]
+                fish_mat_det = fisher_mat_broadcast(grid, lm, mcov_inv) * lm_cov_table[i]**2
+                vals += fish_mat_det
+            else:
+                pass
+
         if np.sum(vals) != 0:
             vals /= np.sum(vals)
         # else:

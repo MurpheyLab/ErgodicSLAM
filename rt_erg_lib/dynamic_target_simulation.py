@@ -58,8 +58,8 @@ class simulation_slam():
         ##########################
         # simulation loop
         ##########################
-        self.log = {'trajectory_true': [], 'trajectory_dr': [], 'true_landmarks': [], 'observations': [], 'mean': [],
-                'covariance': [], 'planning_mean': [], 'planning_cov': [], 'target_dist': [], 'error':[], 'uncertainty':[], 'metric':[]}
+        self.log = {'tf': self.tf, 'trajectory_true': [], 'trajectory_dr': [], 'true_landmarks': [], 'observations': [], 'mean': [],
+                'covariance': [], 'planning_mean': [], 'planning_cov': [], 'target_dist': [], 'error':[], 'uncertainty':[], 'metric_true':[], 'metric_est':[], 'metric_error':[]}
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
@@ -153,6 +153,33 @@ class simulation_slam():
             #     print("data written success !")
 
         print("simulation finished.")
+
+        #######################
+        # calculate and store ergodic metric during simulation
+        #######################
+        xt_true = np.stack(self.log['trajectory_true'])
+        for i in range(self.tf):
+            path_true = xt_true[:i+1, self.model_true.explr_idx]
+            ck_true = convert_traj2ck(self.erg_ctrl_true.basis, path_true)
+            erg_metric = self.erg_ctrl_dr.lamk * (ck_true - self.erg_ctrl_dr.init_phik) ** 2
+            erg_metric = np.sum( erg_metric.reshape(1,-1) )
+            self.log['metric_true'].append(erg_metric)
+        self.log['metric_true'] = np.array(self.log['metric_true'])
+
+        mean_est = np.stack(self.log['mean'])
+        xt_est = mean_est[:, 0:3]
+        for i in range(self.tf):
+            path_est = xt_est[:i+1, self.model_true.explr_idx]
+            ck_est = convert_traj2ck(self.erg_ctrl_true.basis, path_est)
+            erg_metric = self.erg_ctrl_dr.lamk * (ck_est - self.erg_ctrl_dr.init_phik) ** 2
+            erg_metric = np.sum( erg_metric.reshape(1,-1) )
+            self.log['metric_est'].append(erg_metric)
+        self.log['metric_est'] = np.array(self.log['metric_est'])
+
+        self.log['metric_error'] = self.log['metric_true'] - self.log['metric_est']
+
+        # return log for further visualization and evaluation
+        return self.log
 
     def range_bearing(self, id, agent, landmark):
         delta = landmark - agent[0:self.nStates - 1]
@@ -882,3 +909,4 @@ class simulation_slam():
         plt.close()
 
         return fig
+
