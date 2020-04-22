@@ -37,14 +37,18 @@ class TargetDist(object):
         self.has_update = False
         self.grid_vals = self.__call__(self.grid)
         self.target_grid_vals = self.__call__(self.grid)
+        self.belief_vals = self.__call__(self.grid)
 
-    def get_grid_spec(self):
+    def get_grid_spec(self, grid_vals=None):
         xy = []
         for g in self.grid.T:
             xy.append(
                 np.reshape(g, newshape=(self.num_pts, self.num_pts))
             )
-        return xy, self.grid_vals.reshape(self.num_pts, self.num_pts)
+        if grid_vals is None:
+            return xy, self.grid_vals.reshape(self.num_pts, self.num_pts)
+        else:
+            return xy, grid_vals.reshape(self.num_pts, self.num_pts)
 
     def __call__(self, x):
         assert len(x.shape) > 1, 'Input needs to be a of size N x n'
@@ -66,38 +70,9 @@ class TargetDist(object):
             -0.5 * np.dot(np.dot((x - mean).T, np.linalg.inv(var)), (x - mean)))
         return p
 
-    def update0(self, nStates, nLandmark, observed_table, belief_means, belief_vars):
-        p = np.linalg.det(belief_vars[0: nStates, 0: nStates])
-        print("p: ", p)
-        threshold = 1e-05
-        if p < threshold:
-            print("normal exploration")
-            self.reset()
-        else:
-            temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts) for _ in range(2)])
-            grid = np.c_[temp_grid[0].ravel(), temp_grid[1].ravel()]
-
-            vals = np.zeros(grid.shape[0])
-            for i in range(grid.shape[0]):
-                for j in range(nLandmark):
-                    if observed_table[j] == 1:
-                        x = grid[i, :]
-                        mean = belief_means[nStates + 2 * j: nStates + 2 * j + 2]
-                        var = belief_vars[nStates + 2 * j: nStates + 2 * j + 2, nStates + 2 * j: nStates + 2 * j + 2]
-                        p = self.multi_gaussian(x, mean, var)
-                        vals[i] += p
-                    else:
-                        pass
-            if np.sum(vals) != 0:
-                vals /= np.sum(vals)
-            # else:
-            #    vals = np.ones(grid.shape[0])
-
-
-            print("replanning")
-            alpha = p / (p + threshold)
-            # self.grid_vals = (1 - alpha) * self.grid_vals + alpha * vals
-            self.grid_vals = vals
+    def calc_weight(self, p, threshold):
+        alpha = (threshold / (threshold + p**3)) ** 3
+        return alpha
 
     def update1(self, nStates, nLandmark, observed_table, belief_means, belief_vars, threshold=1e-3):
         '''
@@ -126,8 +101,9 @@ class TargetDist(object):
             if observed_table[i] == 1:
                 mean = belief_means[nStates + 2 * i: nStates + 2 * i + 2]
                 var = belief_vars[nStates + 2 * i: nStates + 2 * i + 2, nStates + 2 * i: nStates + 2 * i + 2]
-                rv = multivariate_normal(mean, var)
-                vals += rv.pdf(grid)
+                # rv = multivariate_normal(mean, var)
+                # vals += rv.pdf(grid)
+                vals += multi_gaussian(grid, mean, var)
             else:
                 pass
 
@@ -135,11 +111,11 @@ class TargetDist(object):
             vals /= np.sum(vals)
         # else:
         #     vals = np.ones(grid.shape[0])
+        self.belief_vals = vals
 
-        # threshold = 1e-03
-        # threshold = 4e-04
-        alpha = (p / (p + threshold)) ** 2
-        # print("alpha: ", alpha)
+        alpha = self.calc_weight(p, threshold)
+        print('alpha: ', alpha)
+        print('p: ', p)
         self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals
 
     def update2(self, nStates, nLandmark, observed_table, belief_means, belief_cov, mcov_inv, threshold=1e-3):
@@ -190,10 +166,9 @@ class TargetDist(object):
             vals /= np.sum(vals)
         # else:
         #     vals = np.ones(grid.shape[0])
+        self.belief_vals = vals
 
-        # threshold = 1e-03
-        # threshold = 4e-04
-        alpha = (p / (p + threshold)) ** 2
+        alpha = self.calc_weight(p, threshold)
         # print("alpha: ", alpha)
         self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals
         self.grid_vals /= np.sum(self.grid_vals)
@@ -233,10 +208,9 @@ class TargetDist(object):
             vals /= np.sum(vals)
         # else:
         #     vals = np.ones(grid.shape[0])
+        self.belief_vals = vals
 
-        # threshold = 1e-03
-        # threshold = 4e-04
-        alpha = (p / (p + threshold)) ** 2
+        alpha = self.calc_weight(p, threshold)
         # print("alpha: ", alpha)
         self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals
 
@@ -277,9 +251,8 @@ class TargetDist(object):
             vals /= np.sum(vals)
         # else:
         #     vals = np.ones(grid.shape[0])
+        self.belief_vals = vals
 
-        # threshold = 1e-03
-        # threshold = 4e-04
-        alpha = (p / (p + threshold)) ** 2
+        alpha = self.calc_weight(p, threshold)
         # print("alpha: ", alpha)
         self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals

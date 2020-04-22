@@ -68,8 +68,13 @@ def normalize_angle(angle):
     return normAngle
 
 def multi_gaussian(x, mean, var):
-    p = 1 / np.sqrt(np.linalg.det(2 * pi * var)) * np.exp(
-                    -0.5 * np.dot(np.dot((x - mean).T, np.linalg.inv(var)), (x - mean)))
+    if x.shape[0] == 2:
+        p = 1 / np.sqrt(np.linalg.det(2 * pi * var)) * np.exp(
+                -0.5 * np.dot(np.dot((x - mean).T, np.linalg.inv(var)), (x - mean)))
+    else:
+        var_inv = np.linalg.inv(var)
+        p = 1 / np.sqrt(np.linalg.det(2 * pi * var)) * np.exp(
+                -0.5 * ( (x[:,0]-mean[0])**2*var_inv[0,0] + (x[:,0]-mean[0])*(x[:,1]-mean[1])*(var_inv[0,1]+var_inv[1,0]) + (x[:,1]-mean[1])**2*var_inv[1,1] ))
     return p
 
 def derivative_measure(x, alpha):
@@ -111,7 +116,8 @@ def fisher_mat_broadcast(x, alpha, cov_inv):
     fim3 = dm1 * (dm2*cov_inv[0,0] + dm4*cov_inv[1,0]) + dm3 * (dm2*cov_inv[0,1] + dm4*cov_inv[1,1])
     fim4 = dm2 * (dm2*cov_inv[0,0] + dm4*cov_inv[1,0]) + dm4 * (dm2*cov_inv[0,1] + dm4*cov_inv[1,1])
     # calculate determinant of each FIM
-    det = fim1 * fim3 - fim2 * fim4
+    # det = fim1 * fim3 - fim2 * fim4
+    det = fim1 * fim4 - fim2 * fim3
     # filter out based on dist
     dist = (x[:,0]-alpha[0])**2 + (x[:,1]-alpha[1])**2
     dist_flag = dist < 16
@@ -135,7 +141,7 @@ def sample_expectation(rv, mean, cov, num=1000):
     val /= num
     return val
 
-def evaluation(logs, init_dist=None):
+def evaluation(logs, eval_id=0, init_dist=None, landmarks=None, report=True, show=False):
     '''
     automatic visualize/evaluate/compare results from different simulations
     @logs: 1-D array containing log data returned from simulation.start() method
@@ -146,46 +152,134 @@ def evaluation(logs, init_dist=None):
     fig = plt.figure()
     tf = logs[0]['tf']
     taxis = np.arange(tf)
-    # evaluation
-    if init_dist is None:
-        # first row: comparison of ergodic cost between true trajectory and estimated trajectory for each simulation
+    eval_log = {'avg_metric': [],
+                'avg_metric_err': [],
+                'avg_unc': [],
+                'avg_est_err': []}
+
+    # evaluation report
+    if report:
+        print('-------------------------------------------')
+        print('Time Averaged Ergodic Metric Error')
+        print('-------------------------------------------')
+        for i in range(num_sims):
+            metric_err = np.sum(logs[i]['metric_error']) / tf
+            print('\tSimulation {}: {}'.format( i+1, metric_err ))
+            eval_log['avg_metric_err'].append(metric_err)
+        eval_log['avg_metric_err'] = np.array(eval_log['avg_metric_err'])
+        print('-------------------------------------------')
+        print('Time Averaged State Uncertainty')
+        print('-------------------------------------------')
+        for i in range(num_sims):
+            unc = np.sum(logs[i]['uncertainty']) / tf
+            print('\tSimulation {}: {}'.format( i+1, unc ))
+            eval_log['avg_unc'].append(unc)
+        eval_log['avg_unc'] = np.array(eval_log['avg_unc'])
+        print('-------------------------------------------')
+        print('Time Averaged Estimation Error')
+        print('-------------------------------------------')
+        for i in range(num_sims):
+            est_err = np.sum(logs[i]['error']) / tf
+            print('\tSimulation {}: {}'.format( i+1, est_err ))
+            eval_log['avg_est_err'].append(est_err)
+        eval_log['avg_est_err'] = np.array(eval_log['avg_est_err'])
+        print('-------------------------------------------')
+        print('Time Averaged Ergodic Metric')
+        print('-------------------------------------------')
+        for i in range(num_sims):
+            metric = np.sum(logs[i]['metric_true']) / tf
+            print('\tSimulation {}: {}'.format( i+1, metric ))
+            eval_log['avg_metric'].append(metric)
+        eval_log['avg_metric'] = np.array(eval_log['avg_metric'])
+        print('-------------------------------------------')
+
+    # visualization
+    # first row: comparison of ergodic cost between true trajectory and estimated trajectory for each simulation
+    axes_row_1 = []
+    for i in range(num_sims):
+        axes_row_1.append(fig.add_subplot(2, num_sims, i+1))
+        axes_row_1[i].plot(taxis, logs[i]['metric_true'], c='b')
+        axes_row_1[i].plot(taxis, logs[i]['metric_est'], c='r')
+        axes_row_1[i].set_xlabel('Time Steps')
+        axes_row_1[i].set_ylabel('Ergodic Metric')
+        axes_row_1[i].set_title('Ergodic Metric (Simulation {})'.format(i+1))
+        axes_row_1[i].legend(['True Trajectory', 'Estimated Trajectory'])
+
+    # second row: uncertainty plot and estimation error plot
+    axes_row_21 = fig.add_subplot(2, num_sims, num_sims+1)
+    for i in range(num_sims):
+        axes_row_21.plot(taxis, logs[i]['uncertainty'])
+    axes_row_21.set_xlabel('Time Steps')
+    axes_row_21.set_ylabel('Robot State Uncertainty')
+    axes_row_21.set_title('Robot State Uncertainty Plot')
+    axes_row_21.legend(['Simulation '+str(i+1) for i in range(num_sims)])
+
+    axes_row_22 = fig.add_subplot(2, num_sims, num_sims+2)
+    for i in range(num_sims):
+        axes_row_22.plot(taxis, logs[i]['error'])
+    axes_row_22.set_xlabel('Time Steps')
+    axes_row_22.set_ylabel('State Estimation Error')
+    axes_row_22.set_title('State Estimation Error Plot')
+    axes_row_22.legend(['Simulation '+str(i+1) for i in range(num_sims)])
+
+    '''
+    axes_row_23 = fig.add_subplot(2, num_sims, num_sims+3)
+    for i in range(num_sims):
+        axes_row_23.plot(taxis, logs[i]['metric_error'])
+    axes_row_23.set_xlabel('Time Steps')
+    axes_row_23.set_ylabel('Ergodic Metric Error')
+    axes_row_23.set_title('Ergodic Metric Error Plot')
+    axes_row_23.legend(['Simulation '+str(i+1) for i in range(num_sims)])
+    '''
+
+    axes_row_23 = fig.add_subplot(2, num_sims, num_sims+3)
+    legend_txt = []
+    for i in range(num_sims):
+        axes_row_23.plot(taxis, logs[i]['metric_true'])
+        legend_txt.append('Simulation ' + str(i+1))
+    axes_row_23.plot(taxis, logs[0]['metric_est'], '--')
+    legend_txt.append('Ground Truth')
+    axes_row_23.set_xlabel('Time Steps')
+    axes_row_23.set_ylabel('Actual Ergodic Metric')
+    axes_row_23.set_title('Actual Ergodic Metric Plot')
+    axes_row_23.legend(legend_txt)
+
+    # if provided, plot the trajectory and target distribution
+    if init_dist is not None:
+        # create second figure
+        fig2 = plt.figure()
+        # recover target distribution contour
+        [xy, vals] = init_dist.get_grid_spec()
+        # visualize trajectory of each simulation
         axes_row_1 = []
         for i in range(num_sims):
-            axes_row_1.append(fig.add_subplot(2, num_sims, i+1))
-            axes_row_1[i].plot(taxis, logs[i]['metric_true'], c='b')
-            axes_row_1[i].plot(taxis, logs[i]['metric_est'], c='r')
-            axes_row_1[i].set_xlabel('Time Steps')
-            axes_row_1[i].set_ylabel('Ergodic Metric')
-            axes_row_1[i].set_title('Simulation ' + str(i+1))
-            axes_row_1[i].legend(['True Trajectory', 'Estimated Trajectory'])
-
-        # second row: uncertainty plot and estimation error plot
-        axes_row_21 = fig.add_subplot(2, num_sims, num_sims+1)
-        for i in range(num_sims):
-            axes_row_21.plot(taxis, logs[i]['uncertainty'])
-        axes_row_21.set_xlabel('Time Steps')
-        axes_row_21.set_ylabel('Robot State Uncertainty')
-        axes_row_21.set_title('Robot State Uncertainty Plot')
-        axes_row_21.legend(['Simulation '+str(i+1) for i in range(num_sims)])
-
-        axes_row_22 = fig.add_subplot(2, num_sims, num_sims+2)
-        for i in range(num_sims):
-            axes_row_22.plot(taxis, logs[i]['error'])
-        axes_row_22.set_xlabel('Time Steps')
-        axes_row_22.set_ylabel('State Estimation Error')
-        axes_row_22.set_title('State Estimation Error Plot')
-        axes_row_22.legend(['Simulation '+str(i+1) for i in range(num_sims)])
-
-        axes_row_23 = fig.add_subplot(2, num_sims, num_sims+3)
-        for i in range(num_sims):
-            axes_row_23.plot(taxis, logs[i]['metric_error'])
-        axes_row_23.set_xlabel('Time Steps')
-        axes_row_23.set_ylabel('Ergodic Metric Error')
-        axes_row_23.set_title('Ergodic Metric Error Plot')
-        axes_row_23.legend(['Simulation '+str(i+1) for i in range(num_sims)])
-
-    else:
-        pass
+            # create axes
+            axes_row_1.append(fig2.add_subplot(1, num_sims, i+1))
+            # visualize environment (if provided, landmarks too)
+            axes_row_1[i].contourf(*xy, vals, levels=25)
+            axes_row_1[i].scatter(landmarks[:,0], landmarks[:,1], color='white', marker='P')
+            # recover trajectory
+            xt_true = np.stack(logs[i]['trajectory_true'])
+            mean_est = np.stack(logs[i]['mean'])
+            xt_est = mean_est[:,0:3]
+            # visualize trajectory
+            axes_row_1[i].scatter(xt_true[:,0], xt_true[:,1], s=4, color='red')
+            axes_row_1[i].scatter(xt_est[:,0], xt_est[:,1], s=4, color='green')
+            # axes configuration
+            axes_row_1[i].set_title('Simulation ' + str(i+1) + ' Trajectory')
+            axes_row_1[i].set_aspect('equal', 'box')
 
     # finally, plot all of them :)
-    plt.show()
+    if show:
+        plt.show()
+    else:
+        fig.set_size_inches(18.5, 10.5)
+        fig.savefig('eval_' + str(eval_id) + '_plot_1.png', dpi=120)
+        fig2.set_size_inches(18.5, 10.5)
+        fig2.savefig('eval_' + str(eval_id) + '_plot_2.png', dpi=120)
+
+    plt.close()
+
+    # return evaluation log
+    return eval_log
+
