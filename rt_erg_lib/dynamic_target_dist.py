@@ -105,6 +105,9 @@ class TargetDist(object):
         '''
         p = np.linalg.det(belief_vars[0: nStates, 0: nStates])
         # print("\np: ", p)
+        if p < threshold:
+            self.grid_vals = self.target_grid_vals # replace with "hard" switch
+            return 0
 
         temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts) for _ in range(2)])
         grid = np.c_[temp_grid[0].ravel(), temp_grid[1].ravel()]
@@ -136,11 +139,11 @@ class TargetDist(object):
         # else:
         #     vals = np.ones(grid.shape[0])
 
-        # threshold = 1e-03
-        # threshold = 4e-04
         alpha = (p / (p + threshold)) ** 2
         # print("alpha: ", alpha)
-        self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals
+        # self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals
+        # self.grid_vals /= np.sum(self.grid_vals)
+        self.grid_vals = vals # replace with "hard" switch
 
     def update2(self, nStates, nLandmark, observed_table, belief_means, belief_cov, mcov_inv, threshold=1e-3):
         '''
@@ -148,6 +151,9 @@ class TargetDist(object):
         '''
         p = np.linalg.det(belief_cov[0: nStates, 0: nStates])
         # print("\np: ", p)
+        if p < threshold:
+            self.grid_vals = self.target_grid_vals
+            return 0
 
         temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts) for _ in range(2)])
         grid = np.c_[temp_grid[0].ravel(), temp_grid[1].ravel()]
@@ -183,7 +189,8 @@ class TargetDist(object):
                 lm = belief_means[2 + 2*i + 1 : 2 + 2*i + 3]
                 # fish_mat_det = fisher_mat_broadcast(grid, lm, mcov_inv) # * lm_cov_table[i]**2
                 # vals += fish_mat_det
-                # test new function
+
+                # test new function for sample-based fim
                 lcov = belief_cov[2+2*i+1:2+2*i+3, 2+2*i+1:2+2*i+3]
                 dummy = fisher_mat_expectation_broadcast(grid, lm, mcov_inv, lcov)
                 vals += dummy
@@ -195,12 +202,11 @@ class TargetDist(object):
         # else:
         #     vals = np.ones(grid.shape[0])
 
-        # threshold = 1e-03
-        # threshold = 4e-04
         alpha = (p / (p + threshold)) ** 2
         # print("alpha: ", alpha)
-        self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals
-        self.grid_vals /= np.sum(self.grid_vals)
+        # self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals
+        # self.grid_vals /= np.sum(self.grid_vals)
+        self.grid_vals = vals
 
     def update3(self, nStates, nLandmark, observed_table, belief_means, belief_cov, threshold=1e-3):
         '''

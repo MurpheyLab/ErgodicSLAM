@@ -161,7 +161,7 @@ def sample_expectation(rv, mean, cov, num=1000):
     val /= num
     return val
 
-def evaluation(logs, report=True):
+def evaluation(logs, eval_id=0, report=True, plot=True):
     '''
     automatic visualize/evaluate/compare results from different simulations
     @logs: 1-D array containing log data returned from simulation.start() method
@@ -251,6 +251,39 @@ def evaluation(logs, report=True):
     axes_row_23.set_title('Ergodic Metric Error Plot')
     axes_row_23.legend(['Simulation '+str(i+1) for i in range(num_sims)])
 
+    # plot trajectory in another figure
+    init_dist = logs[0]['target_dist'][0]
+    # create second figure
+    fig2 = plt.figure()
+    # recover target distribution contour
+    [xy, vals] = init_dist.get_grid_spec()
+    # visualize trajectory of each simulation
+    axes_row_1 = []
+    for i in range(num_sims):
+        # create axes
+        axes_row_1.append(fig2.add_subplot(1, num_sims, i+1))
+        # visualize environment (if provided, landmarks too)
+        axes_row_1[i].contourf(*xy, vals, levels=25)
+        landmarks = logs[i]['landmarks']
+        axes_row_1[i].scatter(landmarks[:,0], landmarks[:,1], color='white', marker='P')
+        # recover trajectory
+        xt_true = np.stack(logs[i]['trajectory_true'])
+        mean_est = np.stack(logs[i]['mean'])
+        xt_est = mean_est[:,0:3]
+        # visualize trajectory
+        axes_row_1[i].scatter(xt_true[:,0], xt_true[:,1], s=4, color='red')
+        axes_row_1[i].scatter(xt_est[:,0], xt_est[:,1], s=4, color='green')
+        # axes configuration
+        axes_row_1[i].set_title('Simulation ' + str(i+1) + ' Trajectory')
+        axes_row_1[i].set_aspect('equal', 'box')
 
     # finally, plot all of them :)
-    plt.show()
+    if plot:
+        plt.show()
+    else:
+        fig.set_size_inches(18.5, 10.5)
+        fig.savefig('eval_' + str(eval_id) + '_plot_1.png', dpi=120)
+        fig2.set_size_inches(18.5, 10.5)
+        fig2.savefig('eval_' + str(eval_id) + '_plot_2.png', dpi=120)
+
+    return eval_log

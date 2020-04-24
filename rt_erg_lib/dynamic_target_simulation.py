@@ -59,11 +59,11 @@ class simulation_slam():
         # simulation loop
         ##########################
         self.log = {'tf': self.tf, 'trajectory_true': [], 'trajectory_dr': [], 'true_landmarks': [], 'observations': [], 'mean': [],
-                'covariance': [], 'planning_mean': [], 'planning_cov': [], 'target_dist': [], 'error':[], 'uncertainty':[], 'metric_true':[], 'metric_est':[], 'metric_error':[]}
+                'covariance': [], 'planning_mean': [], 'planning_cov': [], 'target_dist': [], 'error':[], 'uncertainty':[], 'metric_true':[], 'metric_est':[], 'metric_error':[], 'landmarks':self.landmarks}
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
-        print('update mechanism: ', update)
+        print('start simulation ... update mechanism: ', update)
         for t in tqdm(range(self.tf)):
             #########################
             # update target distribution and ergodic controller
@@ -152,23 +152,36 @@ class simulation_slam():
             #     np.save("/home/msun/Code/ErgodicBSP/test/cov_mat", cov)
             #     print("data written success !")
 
-        print("simulation finished.")
 
         #######################
         # calculate and store ergodic metric during simulation
         #######################
+        print('processing ergodic metric ...')
         xt_true = np.stack(self.log['trajectory_true'])
-        for i in range(self.tf):
+        mean_est = np.stack(self.log['mean'])
+        xt_est = mean_est[:, 0:3]
+
+        for i in tqdm(range(self.tf)):
             path_true = xt_true[:i+1, self.model_true.explr_idx]
             ck_true = convert_traj2ck(self.erg_ctrl_true.basis, path_true)
             erg_metric = self.erg_ctrl_dr.lamk * (ck_true - self.erg_ctrl_dr.init_phik) ** 2
             erg_metric = np.sum( erg_metric.reshape(1,-1) )
             self.log['metric_true'].append(erg_metric)
-        self.log['metric_true'] = np.array(self.log['metric_true'])
 
+            path_est = xt_est[:i+1, self.model_true.explr_idx]
+            ck_est = convert_traj2ck(self.erg_ctrl_true.basis, path_est)
+            erg_metric = self.erg_ctrl_dr.lamk * (ck_est - self.erg_ctrl_dr.init_phik) ** 2
+            erg_metric = np.sum( erg_metric.reshape(1,-1) )
+            self.log['metric_est'].append(erg_metric)
+
+        self.log['metric_true'] = np.array(self.log['metric_true'])
+        self.log['metric_est'] = np.array(self.log['metric_est'])
+        self.log['metric_error'] = self.log['metric_true'] - self.log['metric_est']
+
+        '''
         mean_est = np.stack(self.log['mean'])
         xt_est = mean_est[:, 0:3]
-        for i in range(self.tf):
+        for i in tqdm(range(self.tf)):
             path_est = xt_est[:i+1, self.model_true.explr_idx]
             ck_est = convert_traj2ck(self.erg_ctrl_true.basis, path_est)
             erg_metric = self.erg_ctrl_dr.lamk * (ck_est - self.erg_ctrl_dr.init_phik) ** 2
@@ -177,8 +190,10 @@ class simulation_slam():
         self.log['metric_est'] = np.array(self.log['metric_est'])
 
         self.log['metric_error'] = self.log['metric_true'] - self.log['metric_est']
+        '''
 
         # return log for further visualization and evaluation
+        print("simulation finished.")
         return self.log
 
     def range_bearing(self, id, agent, landmark):
