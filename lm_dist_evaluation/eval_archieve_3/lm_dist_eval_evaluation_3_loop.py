@@ -18,7 +18,7 @@ from copy import copy
 # initialization
 ###################################
 
-tf = 1000
+tf = 300
 size = 20.0
 # init_state = np.array([11., 7., 0.0])
 init_state = np.array([10.0, 10.0, 0.0])
