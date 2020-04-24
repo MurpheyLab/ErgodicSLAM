@@ -17,7 +17,7 @@ from math import pi
 # initialization
 ###################################
 
-tf = 1500
+tf = 150
 size = 20.0
 init_state = np.array([11., 7., 0.0])
 sensor_range = 4
@@ -48,7 +48,7 @@ ergCtrlDR1.init_phik = convert_phi2phik(ergCtrlTrue1.basis, t_dist.grid_vals, t_
 
 erg_ctrl_sim1 = simulation_slam(size, init_state, t_dist, modelTrue1, ergCtrlTrue1, envTrue1, modelDR1, ergCtrlDR1, envDR1, tf, landmarks, sensor_range, motion_noise, measure_noise)
 
-# log1 = erg_ctrl_sim1.start(report=True, debug=False, update=0, update_threshold=1e-3)
+log1 = erg_ctrl_sim1.start(report=True, debug=False, update=0, update_threshold=1e-3)
 
 ###################################
 # simulation 2
@@ -68,7 +68,7 @@ ergCtrlDR2.init_phik = convert_phi2phik(ergCtrlTrue2.basis, t_dist.grid_vals, t_
 
 erg_ctrl_sim2 = simulation_slam(size, init_state, t_dist, modelTrue2, ergCtrlTrue2, envTrue2, modelDR2, ergCtrlDR2, envDR2, tf, landmarks, sensor_range, motion_noise, measure_noise)
 
-# log2 = erg_ctrl_sim2.start(report=True, debug=False, update=1, update_threshold=1e-3)
+log2 = erg_ctrl_sim2.start(report=True, debug=False, update=1, update_threshold=1e-3)
 
 ###################################
 # simulation 3
@@ -89,7 +89,7 @@ ergCtrlDR3.init_phik = convert_phi2phik(ergCtrlTrue3.basis, t_dist.grid_vals, t_
 erg_ctrl_sim3 = simulation_slam(size, init_state, t_dist, modelTrue3, ergCtrlTrue3, envTrue3, modelDR3, ergCtrlDR3, envDR3, tf, landmarks, sensor_range, motion_noise, measure_noise)
 
 log3 = erg_ctrl_sim3.start(report=True, debug=False, update=2, update_threshold=1e-3)
-erg_ctrl_sim3.animate3(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
+# erg_ctrl_sim3.animate3(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
 
 ###################################
 # evaluation

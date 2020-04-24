@@ -181,8 +181,12 @@ class TargetDist(object):
         for i in range(nLandmark):
             if observed_table[i] == 1:
                 lm = belief_means[2 + 2*i + 1 : 2 + 2*i + 3]
-                fish_mat_det = fisher_mat_broadcast(grid, lm, mcov_inv) * lm_cov_table[i]**2
-                vals += fish_mat_det
+                # fish_mat_det = fisher_mat_broadcast(grid, lm, mcov_inv) # * lm_cov_table[i]**2
+                # vals += fish_mat_det
+                # test new function
+                lcov = belief_cov[2+2*i+1:2+2*i+3, 2+2*i+1:2+2*i+3]
+                dummy = fisher_mat_expectation_broadcast(grid, lm, mcov_inv, lcov)
+                vals += dummy
             else:
                 pass
 
