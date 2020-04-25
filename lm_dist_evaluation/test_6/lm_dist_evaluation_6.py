@@ -19,7 +19,7 @@ from math import pi
 
 tf = 2000
 size = 20.0
-init_state = np.array([11., 7., 0.0])
+init_state = np.array([13., 7., 0.0])
 sensor_range = 4
 motion_noise = np.array([0.3, 0.2, 0.1]) ** 2
 measure_noise = np.array([0.15, 0.15]) ** 2
@@ -30,7 +30,7 @@ t_dist = TargetDist(num_pts=50, means=means, vars=vars, size=size)
 
 landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/center_single.npy')
 
-eval_time = 10
+eval_time = 5
 eval_logs = []
 for idx in range(eval_time):
     print('evalulation round: ', idx)
@@ -55,8 +55,8 @@ for idx in range(eval_time):
     erg_ctrl_sim1 = simulation_slam(size, init_state, t_dist, modelTrue1, ergCtrlTrue1, envTrue1, modelDR1, ergCtrlDR1, envDR1, tf, landmarks, sensor_range, motion_noise, measure_noise)
 
     log1 = erg_ctrl_sim1.start(report=True, debug=False, update=0, update_threshold=1e-4)
-    erg_ctrl_sim1.animate()
-    erg_ctrl_sim1.new_animate3(point_size=1, alpha=3, show_traj=True, title='Landmarks Distribution Test', rate=50)
+    # erg_ctrl_sim1.animate()
+    # erg_ctrl_sim1.new_animate3(point_size=1, alpha=3, show_traj=True, title='Landmarks Distribution Test', rate=50)
 
     ###################################
     # simulation 2
@@ -126,30 +126,56 @@ avg_unc /= eval_time
 avg_metric_err /= eval_time
 avg_est_err /= eval_time
 
-print('\n\n****************************************')
-print('Final Report')
-print('****************************************\n')
 
-num_sims = avg_metric.shape[0]
-print('----------------------------------------')
-print('Time Averaged State Uncertainty')
-print('----------------------------------------')
-for i in range(num_sims):
-    print('\tSimulation {}: {}'.format(i+1, avg_unc[i]))
-print('----------------------------------------')
-print('Time Averaged Estimation Error')
-print('----------------------------------------')
-for i in range(num_sims):
-    print('\tSimulation {}: {}'.format(i+1, avg_est_err[i]))
-print('----------------------------------------')
-print('Time Averated Ergodic Metric')
-print('----------------------------------------')
-for i in range(num_sims):
-    print('\tSimulation {}: {}'.format(i+1, avg_metric[i]))
-print('----------------------------------------')
-print('Time Averaged Ergodic Metric Error')
-print('----------------------------------------')
-for i in range(num_sims):
-    print('\tSimulation {}: {}'.format(i+1, avg_metric_err[i]))
-print('----------------------------------------')
+with open('final_report', 'w') as fr:
 
+    print('\n\n****************************************')
+    print('Final Report')
+    print('****************************************\n')
+    fr.write('\n\n****************************************\n')
+    fr.write('Final Report\n')
+    fr.write('****************************************\n\n')
+
+
+    num_sims = avg_metric.shape[0]
+    print('----------------------------------------')
+    print('Time Averaged State Uncertainty')
+    print('----------------------------------------')
+    fr.write('----------------------------------------\n')
+    fr.write('Time Averaged State Uncertainty\n')
+    fr.write('----------------------------------------\n')
+    for i in range(num_sims):
+        print('\tSimulation {}: {}'.format(i+1, avg_unc[i]))
+        fr.write('\tSimulation {}: {}\n'.format(i+1, avg_unc[i]))
+
+    print('----------------------------------------')
+    print('Time Averaged Estimation Error')
+    print('----------------------------------------')
+    fr.write('----------------------------------------\n')
+    fr.write('Time Averaged Estimation Error\n')
+    fr.write('----------------------------------------\n')
+    for i in range(num_sims):
+        print('\tSimulation {}: {}'.format(i+1, avg_est_err[i]))
+        fr.write('\tSimulation {}: {}\n'.format(i+1, avg_est_err[i]))
+
+    print('----------------------------------------')
+    print('Time Averated Ergodic Metric')
+    print('----------------------------------------')
+    fr.write('----------------------------------------\n')
+    fr.write('Time Averated Ergodic Metric\n')
+    fr.write('----------------------------------------\n')
+    for i in range(num_sims):
+        print('\tSimulation {}: {}'.format(i+1, avg_metric[i]))
+        fr.write('\tSimulation {}: {}\n'.format(i+1, avg_metric[i]))
+
+    print('----------------------------------------')
+    print('Time Averaged Ergodic Metric Error')
+    print('----------------------------------------')
+    fr.write('----------------------------------------\n')
+    fr.write('Time Averaged Ergodic Metric Error\n')
+    fr.write('----------------------------------------\n')
+    for i in range(num_sims):
+        print('\tSimulation {}: {}'.format(i+1, avg_metric_err[i]))
+        fr.write('\tSimulation {}: {}\n'.format(i+1, avg_metric_err[i]))
+    print('----------------------------------------')
+    fr.write('----------------------------------------\n')

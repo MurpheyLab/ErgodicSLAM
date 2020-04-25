@@ -28,7 +28,9 @@ means = [np.array([14.5, 5.5]), np.array([6.5, 15.5])]
 vars = [np.array([1.2, 1.2])**2, np.array([1.2, 1.2])**2]
 t_dist = TargetDist(num_pts=50, means=means, vars=vars, size=size)
 
-landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/center_single.npy')
+landmarks1 = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/centered_1.npy')
+landmarks2 = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_1.npy')
+landmarks3 = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/uniform_1.npy')
 
 eval_time = 10
 eval_logs = []
@@ -50,13 +52,11 @@ for idx in range(eval_time):
     ergCtrlTrue1.init_phik = convert_phi2phik(ergCtrlTrue1.basis, t_dist.grid_vals, t_dist.grid)
     ergCtrlDR1 = RTErgodicControl(modelDR1, t_dist, horizon=100, num_basis=15, batch_size=200)
     ergCtrlDR1.phik = convert_phi2phik(ergCtrlDR1.basis, t_dist.grid_vals, t_dist.grid)
-    ergCtrlDR1.init_phik = convert_phi2phik(ergCtrlDR1.basis, t_dist.grid_vals, t_dist.grid)
+    ergCtrlDR1.init_phik = convert_phi2phik(ergCtrlTrue1.basis, t_dist.grid_vals, t_dist.grid)
 
-    erg_ctrl_sim1 = simulation_slam(size, init_state, t_dist, modelTrue1, ergCtrlTrue1, envTrue1, modelDR1, ergCtrlDR1, envDR1, tf, landmarks, sensor_range, motion_noise, measure_noise)
+    erg_ctrl_sim1 = simulation_slam(size, init_state, t_dist, modelTrue1, ergCtrlTrue1, envTrue1, modelDR1, ergCtrlDR1, envDR1, tf, landmarks1, sensor_range, motion_noise, measure_noise)
 
-    log1 = erg_ctrl_sim1.start(report=True, debug=False, update=0, update_threshold=1e-4)
-    erg_ctrl_sim1.animate()
-    erg_ctrl_sim1.new_animate3(point_size=1, alpha=3, show_traj=True, title='Landmarks Distribution Test', rate=50)
+    log1 = erg_ctrl_sim1.start(report=True, debug=False, update=0, update_threshold=1e-3)
 
     ###################################
     # simulation 2
@@ -73,11 +73,11 @@ for idx in range(eval_time):
     ergCtrlTrue2.init_phik = convert_phi2phik(ergCtrlTrue2.basis, t_dist.grid_vals, t_dist.grid)
     ergCtrlDR2 = RTErgodicControl(modelDR2, t_dist, horizon=100, num_basis=15, batch_size=200)
     ergCtrlDR2.phik = convert_phi2phik(ergCtrlDR2.basis, t_dist.grid_vals, t_dist.grid)
-    ergCtrlDR2.init_phik = convert_phi2phik(ergCtrlDR2.basis, t_dist.grid_vals, t_dist.grid)
+    ergCtrlDR2.init_phik = convert_phi2phik(ergCtrlTrue2.basis, t_dist.grid_vals, t_dist.grid)
 
-    erg_ctrl_sim2 = simulation_slam(size, init_state, t_dist, modelTrue2, ergCtrlTrue2, envTrue2, modelDR2, ergCtrlDR2, envDR2, tf, landmarks, sensor_range, motion_noise, measure_noise)
+    erg_ctrl_sim2 = simulation_slam(size, init_state, t_dist, modelTrue2, ergCtrlTrue2, envTrue2, modelDR2, ergCtrlDR2, envDR2, tf, landmarks2, sensor_range, motion_noise, measure_noise)
 
-    log2 = erg_ctrl_sim2.start(report=True, debug=False, update=1, update_threshold=1e-4)
+    log2 = erg_ctrl_sim2.start(report=True, debug=False, update=0, update_threshold=1e-3)
 
     ###################################
     # simulation 3
@@ -94,11 +94,11 @@ for idx in range(eval_time):
     ergCtrlTrue3.init_phik = convert_phi2phik(ergCtrlTrue3.basis, t_dist.grid_vals, t_dist.grid)
     ergCtrlDR3 = RTErgodicControl(modelDR3, t_dist, horizon=100, num_basis=15, batch_size=200)
     ergCtrlDR3.phik = convert_phi2phik(ergCtrlDR3.basis, t_dist.grid_vals, t_dist.grid)
-    ergCtrlDR3.init_phik = convert_phi2phik(ergCtrlDR3.basis, t_dist.grid_vals, t_dist.grid)
+    ergCtrlDR3.init_phik = convert_phi2phik(ergCtrlTrue3.basis, t_dist.grid_vals, t_dist.grid)
 
-    erg_ctrl_sim3 = simulation_slam(size, init_state, t_dist, modelTrue3, ergCtrlTrue3, envTrue3, modelDR3, ergCtrlDR3, envDR3, tf, landmarks, sensor_range, motion_noise, measure_noise)
+    erg_ctrl_sim3 = simulation_slam(size, init_state, t_dist, modelTrue3, ergCtrlTrue3, envTrue3, modelDR3, ergCtrlDR3, envDR3, tf, landmarks3, sensor_range, motion_noise, measure_noise)
 
-    log3 = erg_ctrl_sim3.start(report=True, debug=False, update=2, update_threshold=1e-4)
+    log3 = erg_ctrl_sim3.start(report=True, debug=False, update=0, update_threshold=1e-3)
     # erg_ctrl_sim3.animate3(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
 
     ###################################
@@ -126,30 +126,56 @@ avg_unc /= eval_time
 avg_metric_err /= eval_time
 avg_est_err /= eval_time
 
-print('\n\n****************************************')
-print('Final Report')
-print('****************************************\n')
 
-num_sims = avg_metric.shape[0]
-print('----------------------------------------')
-print('Time Averaged State Uncertainty')
-print('----------------------------------------')
-for i in range(num_sims):
-    print('\tSimulation {}: {}'.format(i+1, avg_unc[i]))
-print('----------------------------------------')
-print('Time Averaged Estimation Error')
-print('----------------------------------------')
-for i in range(num_sims):
-    print('\tSimulation {}: {}'.format(i+1, avg_est_err[i]))
-print('----------------------------------------')
-print('Time Averated Ergodic Metric')
-print('----------------------------------------')
-for i in range(num_sims):
-    print('\tSimulation {}: {}'.format(i+1, avg_metric[i]))
-print('----------------------------------------')
-print('Time Averaged Ergodic Metric Error')
-print('----------------------------------------')
-for i in range(num_sims):
-    print('\tSimulation {}: {}'.format(i+1, avg_metric_err[i]))
-print('----------------------------------------')
+with open('final_report', 'w') as fr:
 
+    print('\n\n****************************************')
+    print('Final Report')
+    print('****************************************\n')
+    fr.write('\n\n****************************************\n')
+    fr.write('Final Report\n')
+    fr.write('****************************************\n\n')
+
+
+    num_sims = avg_metric.shape[0]
+    print('----------------------------------------')
+    print('Time Averaged State Uncertainty')
+    print('----------------------------------------')
+    fr.write('----------------------------------------\n')
+    fr.write('Time Averaged State Uncertainty\n')
+    fr.write('----------------------------------------\n')
+    for i in range(num_sims):
+        print('\tSimulation {}: {}'.format(i+1, avg_unc[i]))
+        fr.write('\tSimulation {}: {}\n'.format(i+1, avg_unc[i]))
+
+    print('----------------------------------------')
+    print('Time Averaged Estimation Error')
+    print('----------------------------------------')
+    fr.write('----------------------------------------\n')
+    fr.write('Time Averaged Estimation Error\n')
+    fr.write('----------------------------------------\n')
+    for i in range(num_sims):
+        print('\tSimulation {}: {}'.format(i+1, avg_est_err[i]))
+        fr.write('\tSimulation {}: {}\n'.format(i+1, avg_est_err[i]))
+
+    print('----------------------------------------')
+    print('Time Averated Ergodic Metric')
+    print('----------------------------------------')
+    fr.write('----------------------------------------\n')
+    fr.write('Time Averated Ergodic Metric\n')
+    fr.write('----------------------------------------\n')
+    for i in range(num_sims):
+        print('\tSimulation {}: {}'.format(i+1, avg_metric[i]))
+        fr.write('\tSimulation {}: {}\n'.format(i+1, avg_metric[i]))
+
+    print('----------------------------------------')
+    print('Time Averaged Ergodic Metric Error')
+    print('----------------------------------------')
+    fr.write('----------------------------------------\n')
+    fr.write('Time Averaged Ergodic Metric Error\n')
+    fr.write('----------------------------------------\n')
+    for i in range(num_sims):
+        print('\tSimulation {}: {}'.format(i+1, avg_metric_err[i]))
+        fr.write('\tSimulation {}: {}\n'.format(i+1, avg_metric_err[i]))
+    print('----------------------------------------')
+    fr.write('----------------------------------------\n')
