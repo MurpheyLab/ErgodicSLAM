@@ -11,6 +11,7 @@ class RTErgodicControl(object):
 
         self.model       = model
         self.target_dist = target_dist
+        self.init_target_dist = target_dist
         self.horizon     = horizon
         self.replay_buffer = ReplayBuffer(capacity)
         self.batch_size    = batch_size

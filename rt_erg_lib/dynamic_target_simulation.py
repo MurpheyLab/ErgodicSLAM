@@ -39,6 +39,8 @@ class simulation_slam():
         self.observed_landmarks = np.zeros(self.landmarks.shape[0])
         self.threshold = 99999999
 
+        self.init_phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.t_dist.target_grid_vals, self.t_dist.grid)
+
     def start(self, report=False, debug=False, update=1, update_threshold=1e-3):
         #########################
         # initialize mean and covariance matrix
@@ -65,6 +67,7 @@ class simulation_slam():
 
         print('start simulation ... update mechanism: ', update)
         for t in tqdm(range(self.tf)):
+            '''
             #########################
             # update target distribution and ergodic controller
             #########################
@@ -85,6 +88,7 @@ class simulation_slam():
             # record target distribution for replay and visualization
             t_dist = copy.copy(self.erg_ctrl_dr.target_dist)
             self.log['target_dist'].append(t_dist)
+            '''
 
             #########################
             # generate control and measurement data
@@ -152,6 +156,26 @@ class simulation_slam():
             #     np.save("/home/msun/Code/ErgodicBSP/test/cov_mat", cov)
             #     print("data written success !")
 
+            #########################
+            # update target distribution and ergodic controller
+            #########################
+            # update target distribution with different update schemes
+            if update == 0:
+                self.log['target_dist'].append(self.erg_ctrl_dr.init_target_dist)
+            else:
+                if update == 1:
+                    self.erg_ctrl_dr.target_dist.update1(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+                if update == 2:
+                    self.erg_ctrl_dr.target_dist.update2(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, self.mcov_inv, threshold=update_threshold)
+                if update == 3:
+                    self.erg_ctrl_dr.target_dist.update3(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+                if update == 4:
+                    self.erg_ctrl_dr.target_dist.update4(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+                # update phi for ergodic controller
+                self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals, self.erg_ctrl_dr.target_dist.grid)
+                # record target distribution for replay and visualization
+                t_dist = copy.copy(self.erg_ctrl_dr.target_dist)
+                self.log['target_dist'].append(t_dist)
 
         #######################
         # calculate and store ergodic metric during simulation
@@ -164,19 +188,19 @@ class simulation_slam():
         for i in tqdm(range(self.tf)):
             path_true = xt_true[:i+1, self.model_true.explr_idx]
             ck_true = convert_traj2ck(self.erg_ctrl_true.basis, path_true)
-            erg_metric = self.erg_ctrl_dr.lamk * (ck_true - self.erg_ctrl_dr.init_phik) ** 2
+            erg_metric = self.erg_ctrl_dr.lamk * (ck_true - self.init_phik) ** 2
             erg_metric = np.sum( erg_metric.reshape(1,-1) )
             self.log['metric_true'].append(erg_metric)
 
             path_est = xt_est[:i+1, self.model_true.explr_idx]
             ck_est = convert_traj2ck(self.erg_ctrl_true.basis, path_est)
-            erg_metric = self.erg_ctrl_dr.lamk * (ck_est - self.erg_ctrl_dr.init_phik) ** 2
+            erg_metric = self.erg_ctrl_dr.lamk * (ck_est - self.init_phik) ** 2
             erg_metric = np.sum( erg_metric.reshape(1,-1) )
             self.log['metric_est'].append(erg_metric)
 
         self.log['metric_true'] = np.array(self.log['metric_true'])
         self.log['metric_est'] = np.array(self.log['metric_est'])
-        self.log['metric_error'] = self.log['metric_true'] - self.log['metric_est']
+        self.log['metric_error'] = np.abs( self.log['metric_true'] - self.log['metric_est'] )
 
         '''
         mean_est = np.stack(self.log['mean'])

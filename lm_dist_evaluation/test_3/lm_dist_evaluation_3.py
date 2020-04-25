@@ -17,7 +17,7 @@ from math import pi
 # initialization
 ###################################
 
-tf = 1500
+tf = 2000
 size = 20.0
 init_state = np.array([11., 7., 0.0])
 sensor_range = 4
@@ -30,7 +30,7 @@ t_dist = TargetDist(num_pts=50, means=means, vars=vars, size=size)
 
 landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/center_single.npy')
 
-eval_time = 10
+eval_time = 20
 eval_logs = []
 for idx in range(eval_time):
     print('evalulation round: ', idx)
