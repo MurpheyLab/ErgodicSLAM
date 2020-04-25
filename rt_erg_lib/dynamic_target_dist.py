@@ -37,14 +37,18 @@ class TargetDist(object):
         self.has_update = False
         self.grid_vals = self.__call__(self.grid)
         self.target_grid_vals = self.__call__(self.grid)
+        self.belief_vals = np.ones(self.grid_vals.shape) / np.sum(np.ones(self.grid_vals.shape))
 
-    def get_grid_spec(self):
+    def get_grid_spec(self, vals=None):
         xy = []
         for g in self.grid.T:
             xy.append(
                 np.reshape(g, newshape=(self.num_pts, self.num_pts))
             )
-        return xy, self.grid_vals.reshape(self.num_pts, self.num_pts)
+        if vals is None:
+            return xy, self.grid_vals.reshape(self.num_pts, self.num_pts)
+        else:
+            return xy, vals.reshape(self.num_pts, self.num_pts)
 
     def __call__(self, x):
         assert len(x.shape) > 1, 'Input needs to be a of size N x n'
@@ -92,6 +96,7 @@ class TargetDist(object):
                 vals /= np.sum(vals)
             # else:
             #    vals = np.ones(grid.shape[0])
+            self.belief_vals = vals
 
 
             print("replanning")
@@ -138,6 +143,7 @@ class TargetDist(object):
             vals /= np.sum(vals)
         # else:
         #     vals = np.ones(grid.shape[0])
+        self.belief_vals = vals
 
         alpha = (p / (p + threshold)) ** 2
         # print("alpha: ", alpha)
@@ -201,6 +207,7 @@ class TargetDist(object):
             vals /= np.sum(vals)
         # else:
         #     vals = np.ones(grid.shape[0])
+        self.belief_vals = vals
 
         alpha = (p / (p + threshold)) ** 2
         # print("alpha: ", alpha)

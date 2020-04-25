@@ -286,4 +286,7 @@ def evaluation(logs, eval_id=0, report=True, plot=True):
         fig2.set_size_inches(18.5, 10.5)
         fig2.savefig('eval_' + str(eval_id) + '_plot_2.png', dpi=120)
 
+    plt.close(fig)
+    plt.close(fig2)
+
     return eval_log
