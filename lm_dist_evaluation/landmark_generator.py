@@ -52,12 +52,40 @@ landmarks = np.concatenate((landmarks1, landmarks2))
 np.save('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_1.npy', landmarks)
 '''
 
-landmarks = np.array([[14., 6.],
-                      [ 6.,14.]])
+
+landmarks = np.array([[ 5.5, 5.5],
+                      [14.5,14.5]])
 # landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
 # landmarks2 = np.random.uniform(2.0, 8.0, size=(10, 2))
 # landmarks = np.concatenate((np.concatenate((landmarks1, landmarks2)), landmarks))
 
 np.save('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual.npy', landmarks)
+
+
+
+landmarks = np.array([[14.5, 5.5],
+                      [ 5.5,14.5]])
+# landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
+# landmarks2 = np.random.uniform(2.0, 8.0, size=(10, 2))
+# landmarks = np.concatenate((np.concatenate((landmarks1, landmarks2)), landmarks))
+
+np.save('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual_2.npy', landmarks)
+
+
+landmarks = np.array([[14.5, 5.5]])
+# landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
+# landmarks2 = np.random.uniform(2.0, 8.0, size=(10, 2))
+# landmarks = np.concatenate((np.concatenate((landmarks1, landmarks2)), landmarks))
+
+np.save('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_single.npy', landmarks)
+
+
+landmarks = np.array([[ 2.5, 2.5],
+                      [17.5,17.5]])
+# landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
+# landmarks2 = np.random.uniform(2.0, 8.0, size=(10, 2))
+# landmarks = np.concatenate((np.concatenate((landmarks1, landmarks2)), landmarks))
+
+np.save('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual_3.npy', landmarks)
 
 

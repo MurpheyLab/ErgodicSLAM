@@ -19,19 +19,19 @@ from math import pi
 
 tf = 2000
 size = 20.0
-init_state = np.array([13., 7., 0.0])
+init_state = np.array([10., 10., 0.0])
 sensor_range = 4
-motion_noise = np.array([0.15, 0.15, 0.1]) ** 2
+motion_noise = np.array([0.2, 0.2, 0.1]) ** 2
 measure_noise = np.array([0.15, 0.15]) ** 2
-threshold = 1e-4
+threshold = 5e-3
 
-means = [np.array([14.5, 5.5]), np.array([6.5, 15.5])]
+means = [np.array([14.5, 5.5]), np.array([4.5, 15.5])]
 vars = [np.array([1.2, 1.2])**2, np.array([1.2, 1.2])**2]
 t_dist = TargetDist(num_pts=50, means=means, vars=vars, size=size)
 
-landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual.npy')
+landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual_2.npy')
 
-eval_time = 5
+eval_time = 1
 eval_logs = []
 for idx in range(eval_time):
     print('evalulation round: ', idx)
@@ -56,8 +56,6 @@ for idx in range(eval_time):
     erg_ctrl_sim1 = simulation_slam(size, init_state, t_dist, modelTrue1, ergCtrlTrue1, envTrue1, modelDR1, ergCtrlDR1, envDR1, tf, landmarks, sensor_range, motion_noise, measure_noise)
 
     log1 = erg_ctrl_sim1.start(report=True, debug=False, update=0, update_threshold=threshold)
-    # erg_ctrl_sim1.animate()
-    # erg_ctrl_sim1.new_animate3(point_size=1, alpha=3, show_traj=True, title='Landmarks Distribution Test', rate=50)
 
     ###################################
     # simulation 2
@@ -79,6 +77,7 @@ for idx in range(eval_time):
     erg_ctrl_sim2 = simulation_slam(size, init_state, t_dist, modelTrue2, ergCtrlTrue2, envTrue2, modelDR2, ergCtrlDR2, envDR2, tf, landmarks, sensor_range, motion_noise, measure_noise)
 
     log2 = erg_ctrl_sim2.start(report=True, debug=False, update=1, update_threshold=threshold)
+    
 
     ###################################
     # simulation 3
@@ -100,7 +99,7 @@ for idx in range(eval_time):
     erg_ctrl_sim3 = simulation_slam(size, init_state, t_dist, modelTrue3, ergCtrlTrue3, envTrue3, modelDR3, ergCtrlDR3, envDR3, tf, landmarks, sensor_range, motion_noise, measure_noise)
 
     log3 = erg_ctrl_sim3.start(report=True, debug=False, update=2, update_threshold=threshold)
-    # erg_ctrl_sim3.animate3(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
+
 
     ###################################
     # evaluation
@@ -109,6 +108,18 @@ for idx in range(eval_time):
     eval_log = evaluation([log1, log2, log3], eval_id=idx, plot=False)
     eval_logs.append(eval_log)
 
+
+###################################
+# animation
+###################################
+erg_ctrl_sim1.animate()
+erg_ctrl_sim1.new_animate3(point_size=1, alpha=3, show_traj=True, title='Landmarks Distribution Test', rate=50)
+
+erg_ctrl_sim2.animate()
+erg_ctrl_sim2.new_animate3(point_size=1, alpha=3, show_traj=True, title='Landmarks Distribution Test', rate=50)
+
+erg_ctrl_sim3.animate()
+erg_ctrl_sim3.new_animate3(point_size=1, alpha=3, show_traj=True, title='Landmarks Distribution Test', rate=50)
 
 ###################################
 # process averaged data

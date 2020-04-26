@@ -17,21 +17,21 @@ from math import pi
 # initialization
 ###################################
 
-tf = 2000
+tf = 3000
 size = 20.0
-init_state = np.array([13., 7., 0.0])
+init_state = np.array([5., 5., 0.0])
 sensor_range = 4
-motion_noise = np.array([0.15, 0.15, 0.1]) ** 2
-measure_noise = np.array([0.15, 0.15]) ** 2
-threshold = 1e-4
+motion_noise = np.array([0.02, 0.02, 0.005])
+measure_noise = np.array([0.01, 0.01])
+threshold = 5e-4
 
-means = [np.array([14.5, 5.5]), np.array([6.5, 15.5])]
+means = [np.array([14.5, 5.5]), np.array([4.5, 15.5])]
 vars = [np.array([1.2, 1.2])**2, np.array([1.2, 1.2])**2]
 t_dist = TargetDist(num_pts=50, means=means, vars=vars, size=size)
 
 landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual.npy')
 
-eval_time = 5
+eval_time = 10
 eval_logs = []
 for idx in range(eval_time):
     print('evalulation round: ', idx)

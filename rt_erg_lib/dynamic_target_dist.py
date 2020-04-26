@@ -112,6 +112,7 @@ class TargetDist(object):
         # print("\np: ", p)
         if p < threshold:
             self.grid_vals = self.target_grid_vals # replace with "hard" switch
+            self.belief_vals = self.target_grid_vals
             return 0
 
         temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts) for _ in range(2)])
@@ -159,6 +160,7 @@ class TargetDist(object):
         # print("\np: ", p)
         if p < threshold:
             self.grid_vals = self.target_grid_vals
+            self.belief_vals = self.target_grid_vals
             return 0
 
         temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts) for _ in range(2)])
