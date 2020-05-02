@@ -142,8 +142,8 @@ class TargetDist(object):
 
         if np.sum(vals) != 0:
             vals /= np.sum(vals)
-        # else:
-        #     vals = np.ones(grid.shape[0])
+        else:
+            vals = self.target_grid_vals
         self.belief_vals = vals
 
         alpha = (p / (p + threshold)) ** 2
@@ -207,8 +207,8 @@ class TargetDist(object):
 
         if np.sum(vals) != 0:
             vals /= np.sum(vals)
-        # else:
-        #     vals = np.ones(grid.shape[0])
+        else:
+            vals = self.target_grid_vals
         self.belief_vals = vals
 
         alpha = (p / (p + threshold)) ** 2
