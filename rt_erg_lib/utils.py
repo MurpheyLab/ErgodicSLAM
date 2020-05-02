@@ -60,8 +60,9 @@ def normalize_angle(angle):
     '''
     normalize angle into [-pi, pi]
     '''
+    print('angle to be normalized: ', angle)
     normAngle = angle
-    while normAngle > pi:
+    while normAngle >= pi:
         normAngle -= 2*pi
     while normAngle < -pi:
         normAngle += 2*pi
