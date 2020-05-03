@@ -2,7 +2,7 @@ import numpy as np
 from numpy import exp, sqrt
 import matplotlib.pyplot as plt
 
-landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual_3.npy')
+landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/center_single.npy')
 
 num_pts = 50
 size = 20
@@ -22,16 +22,19 @@ for lm in landmarks:
     grid_vals += mat11 * mat22 - mat12 * mat21
 '''
 
-def fisher_mat(r, lm, cov_inv):
+def fisher_mat(r, lm, cov):
     dist = sqrt( (r[0]-lm[0])**2 + (r[1]-lm[1])**2 )
     if dist > 4:
         return 0
     else:
         dm11 = (r[0]-lm[0]) * dist
-        dm21 = (r[1]-lm[1]) * dist
-        dm12 = 2*(r[0]-lm[0])*(r[1]-lm[1]) / (dist**2)
+        dm12 = (r[1]-lm[1]) * dist
+        dm21 = 2*(r[0]-lm[0])*(r[1]-lm[1]) / (dist**2)
         dm22 =-2*(r[0]-lm[0])*(r[1]-lm[1]) / (dist**2)
         dm = np.array([[dm11,dm12],[dm21,dm22]])
+
+        cov_inv = np.linalg.inv(cov * dist**2)
+
         fim = np.dot(np.dot(dm.T, cov_inv), dm)
         # return np.linalg.det(fim)
         return np.trace(fim)

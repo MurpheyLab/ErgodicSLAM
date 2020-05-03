@@ -17,18 +17,18 @@ from math import pi
 # initialization
 ###################################
 
-tf = 1800
+tf = 1500
 size = 20.0
-init_state = np.array([11., 7., 0.0])
+init_state = np.array([10., 10., 0.0])
 sensor_range = 4
-motion_noise = np.array([0.03, 0.02, 0.01])
+motion_noise = np.array([0.03, 0.03, 0.01])
 measure_noise = np.array([0.01, 0.01])
 
-means = [np.array([14.5, 5.5]), np.array([6.5, 15.5])]
+means = [np.array([14.5, 5.5]), np.array([4.5, 15.5])]
 vars = [np.array([1.2, 1.2])**2, np.array([1.2, 1.2])**2]
-t_dist = TargetDist(num_pts=50, means=means, vars=vars, size=size)
+t_dist = TargetDist(num_pts=100, means=means, vars=vars, size=size)
 
-landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/uniform_1.npy')
+landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual_3.npy')
 
 ###################################
 # simulation 1

@@ -103,13 +103,10 @@ class simulation_slam():
             # EKF SLAM
             #########################
             mean[2] = normalize_angle(mean[2])
-            print("\n\n-------------------------\nmean before preidction: ", mean, end='\n--------------------------\n\n')
             predict_mean, predict_cov = self.ekf_slam_prediction(mean, cov, ctrl, self.R)
             predict_mean[2] = normalize_angle(predict_mean[2])
-            print("\n\n-------------------------\nmean after prediction: ", predict_mean, end='\n--------------------------\n\n')
             predict_mean, predict_cov = self.ekf_correction(predict_mean, predict_cov, observations, self.Q)
             predict_mean[2] = normalize_angle(predict_mean[2])
-            print("\n\n-------------------------\nmean after correction: ", predict_mean, end='\n--------------------------\n\n')
 
             self.log['mean'].append(predict_mean)
             self.log['covariance'].append(predict_cov)
@@ -183,12 +180,9 @@ class simulation_slam():
         return self.log
 
     def range_bearing(self, id, agent, landmark):
-        if agent[0] > 30:
-            print("agent: ", agent)
         delta = landmark - agent[0:2]
         range = np.sqrt(np.dot(delta.T, delta))
         bearing = math.atan2(delta[1], delta[0]) - agent[2]
-        print("bearing: ", bearing)
         bearing = normalize_angle(bearing)
         return np.array([id, range, bearing])
 
@@ -239,7 +233,6 @@ class simulation_slam():
         cov = predict_cov.copy()
 
         # iterate each observed landmark
-        print("\n**************************\n")
         for obs in z:
             # normalize angle
             mean[2] = normalize_angle(mean[2])
@@ -248,12 +241,10 @@ class simulation_slam():
             measurement = obs[1:]
             # est_landmark = np.array([mean[2 + 2 * id + 1], mean[2 + 2 * id + 2]])
             est_landmark = self.landmarks[id]
-            print("est_landmark: ", est_landmark)
             # get expected measurement (range-bearing)
             delta = est_landmark - mean[0:2]
             zi = self.range_bearing(id, mean[0:3], est_landmark)
             zi = zi[1:]
-            print('zi[1]: ', zi[1])
             zi[1] = normalize_angle(zi[1])
             q = zi[0] ** 2
             q_sqrt = zi[0]
@@ -281,7 +272,6 @@ class simulation_slam():
             diff_z = measurement - zi
             diff_z[1] = normalize_angle(diff_z[1])
             if diff_z[1] > 3.14:
-                print('diff_z[1]: ', diff_z[1])
                 diff_z[1] = 2*pi - diff_z[1]
             mean += np.dot(K, diff_z)
             cov -= np.dot(np.dot(K, H), cov)
