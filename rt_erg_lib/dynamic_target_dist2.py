@@ -2,7 +2,7 @@
 
 import numpy as np
 import numpy.random as npr
-from math import pi
+from numpy import pi, sqrt, exp
 from .utils import *
 from scipy.stats import multivariate_normal
 
@@ -15,7 +15,7 @@ class TargetDist(object):
     '''
 
     # 2020-03-01: add "size" parameter to support customizable exploration area size
-    def __init__(self, num_pts, means, vars, size):
+    def __init__(self, num_pts, means, vars, size, landmarks, mcov, sensor_range):
 
         # TODO: create a message class for this
         # rospy.Subscriber('/target_distribution',  CLASSNAME, self.callback)
@@ -24,6 +24,9 @@ class TargetDist(object):
         self.size = size
         grid = np.meshgrid(*[np.linspace(0, size, num_pts) for _ in range(2)])
         self.grid = np.c_[grid[0].ravel(), grid[1].ravel()]
+        self.landmarks = landmarks
+        self.cov_inv = np.linalg.inv(mcov)
+        self.sensor_range = sensor_range
 
         # self.means = [npr.uniform(0.2, 0.8, size=(2,))
         #                     for _ in range(num_nodes)]
@@ -35,9 +38,30 @@ class TargetDist(object):
         # print("means: ", self.means)
 
         self.has_update = False
-        self.grid_vals = self.__call__(self.grid)
-        self.target_grid_vals = self.__call__(self.grid)
-        self.belief_vals = np.ones(self.grid_vals.shape) / np.sum(np.ones(self.grid_vals.shape))
+        self.grid_vals = self.__call__(self.grid) # the actual grid vals that robot set as target
+        self.target_grid_vals = self.__call__(self.grid) # target grid vals set as task
+        self.belief_vals = self.init_fim()
+
+    def init_fim(self): # init fim (just once)
+        vals = np.zeros(self.grid.shape[0])
+        for i in range(self.grid.shape[0]):
+            r = self.grid[i]
+            for lm in self.landmarks:
+                # compute fim
+                fim = 0
+                dist = sqrt( (r[0]-lm[0])**2 + (r[1]-lm[1])**2 )
+                if(dist <= self.sensor_range):
+                    dm11 = (r[0]-lm[0]) * dist
+                    dm12 = (r[1]-lm[1]) * dist
+                    dm21 = 2*(r[0]-lm[0])*(r[1]-lm[1]) / (dist**2)
+                    dm22 =-2*(r[0]-lm[0])*(r[1]-lm[1]) / (dist**2)
+                    dm = np.array([[dm11, dm12], [dm21, dm22]])
+                    fim = np.trace( np.dot(np.dot(dm.T, self.cov_inv), dm) )
+                vals[i] += fim
+        if(np.sum(vals) != 0): # normalize
+            vals /= np.sum(vals)
+        return vals
+
 
     def get_grid_spec(self, vals=None):
         xy = []
@@ -70,152 +94,36 @@ class TargetDist(object):
             -0.5 * np.dot(np.dot((x - mean).T, np.linalg.inv(var)), (x - mean)))
         return p
 
-    def update0(self, nStates, nLandmark, observed_table, belief_means, belief_vars):
-        p = np.linalg.det(belief_vars[0: nStates, 0: nStates])
-        print("p: ", p)
-        threshold = 1e-05
-        if p < threshold:
-            print("normal exploration")
-            self.reset()
-        else:
-            temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts) for _ in range(2)])
-            grid = np.c_[temp_grid[0].ravel(), temp_grid[1].ravel()]
+    def update0(self, nStates, belief_means, belief_vars):
+        pass
 
-            vals = np.zeros(grid.shape[0])
-            for i in range(grid.shape[0]):
-                for j in range(nLandmark):
-                    if observed_table[j] == 1:
-                        x = grid[i, :]
-                        mean = belief_means[nStates + 2 * j: nStates + 2 * j + 2]
-                        var = belief_vars[nStates + 2 * j: nStates + 2 * j + 2, nStates + 2 * j: nStates + 2 * j + 2]
-                        p = self.multi_gaussian(x, mean, var)
-                        vals[i] += p
-                    else:
-                        pass
-            if np.sum(vals) != 0:
-                vals /= np.sum(vals)
-            # else:
-            #    vals = np.ones(grid.shape[0])
-            self.belief_vals = vals
-
-
-            print("replanning")
-            alpha = p / (p + threshold)
-            # self.grid_vals = (1 - alpha) * self.grid_vals + alpha * vals
-            self.grid_vals = vals
-
-    def update1(self, nStates, nLandmark, observed_table, belief_means, belief_vars, threshold=1e-3):
+    def update1(self, nStates, belief_means, belief_cov, threshold=1e-3):
         '''
-        intuitive update: using landmark uncertainty directly
+        intuitive update: hard switch with FIM field
         '''
-        p = np.linalg.det(belief_vars[0: nStates, 0: nStates])
-        # print("\np: ", p)
+        p = np.linalg.det(belief_cov[0: nStates, 0: nStates])
+
         if p < threshold:
             self.grid_vals = self.target_grid_vals # replace with "hard" switch
-            self.belief_vals = self.target_grid_vals
-            return 0
-
-        temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts) for _ in range(2)])
-        grid = np.c_[temp_grid[0].ravel(), temp_grid[1].ravel()]
-        ''' old implementation (too slow!)
-        vals = np.zeros(grid.shape[0])
-        for i in range(grid.shape[0]):
-            for j in range(nLandmark):
-                if observed_table[j] == 1:
-                    x = grid[i, :]
-                    mean = belief_means[nStates + 2 * j: nStates + 2 * j + 2]
-                    var = belief_vars[nStates + 2 * j: nStates + 2 * j + 2, nStates + 2 * j: nStates + 2 * j + 2]
-                    px = self.multi_gaussian(x, mean, var)
-                    vals[i] += px
-                else:
-                    pass
-        '''
-        vals = np.zeros(grid.shape[0])
-        for i in range(nLandmark):
-            if observed_table[i] == 1:
-                mean = belief_means[nStates + 2 * i: nStates + 2 * i + 2]
-                var = belief_vars[nStates + 2 * i: nStates + 2 * i + 2, nStates + 2 * i: nStates + 2 * i + 2]
-                rv = multivariate_normal(mean, var)
-                vals += rv.pdf(grid)
-            else:
-                pass
-
-        if np.sum(vals) != 0:
-            vals /= np.sum(vals)
         else:
-            vals = self.target_grid_vals
-        self.belief_vals = vals
+            self.grid_vals = self.belief_vals
 
-        alpha = (p / (p + threshold)) ** 2
-        # print("alpha: ", alpha)
-        # self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals
-        # self.grid_vals /= np.sum(self.grid_vals)
-        self.grid_vals = vals # replace with "hard" switch
 
-    def update2(self, nStates, nLandmark, observed_table, belief_means, belief_cov, mcov_inv, threshold=1e-3):
+    def update2(self, nStates, belief_means, belief_cov, threshold=1e-3):
         '''
-        update using fisher information matrix approximated at mean
+        update using FIM with linear transform
         '''
         p = np.linalg.det(belief_cov[0: nStates, 0: nStates])
         # print("\np: ", p)
         if p < threshold:
             self.grid_vals = self.target_grid_vals
-            self.belief_vals = self.target_grid_vals
-            return 0
-
-        temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts) for _ in range(2)])
-        grid = np.c_[temp_grid[0].ravel(), temp_grid[1].ravel()]
-
-        lm_cov_table = []
-        for i in range(nLandmark):
-            if observed_table[i] == 1:
-                lm = belief_means[2 + 2*i + 1: 2 + 2*i + 3]
-                cov = belief_cov[2+2*i+1:2+2*i+3, 2+2*i+1:2+2*i+3]
-                lm_cov_table.append(multi_gaussian(lm, lm, cov))
-            else:
-                lm_cov_table.append(0)
-
-        vals = np.zeros(grid.shape[0])
-        ''' old implementation (too slow !)
-        for i in range(grid.shape[0]):
-            x = grid[i,:]
-            fisher_mat_val = 0
-            # subfunc = lambda lm1, lm2: fisher_mat(x, [lm1, lm2], mcov_inv)
-            for j in range(nLandmark):
-                if observed_table[j] == 1:
-                    lm = belief_means[2 + 2*j + 1: 2 + 2*j + 3]
-                    cov = belief_cov[2+2*j+1:2+2*j+3, 2+2*j+1:2+2*j+3]
-                    mat = fisher_mat(x, lm, mcov_inv) * lm_cov_table[j]
-                else:
-                    mat = np.zeros((nStates-1, nStates-1))
-                fisher_mat_val += np.linalg.det(mat)
-            vals[i] = fisher_mat_val
-        vals = np.array(vals)
-        '''
-        for i in range(nLandmark):
-            if observed_table[i] == 1:
-                lm = belief_means[2 + 2*i + 1 : 2 + 2*i + 3]
-                # fish_mat_det = fisher_mat_broadcast(grid, lm, mcov_inv) # * lm_cov_table[i]**2
-                # vals += fish_mat_det
-
-                # test new function for sample-based fim
-                lcov = belief_cov[2+2*i+1:2+2*i+3, 2+2*i+1:2+2*i+3]
-                dummy = fisher_mat_expectation_broadcast(grid, lm, mcov_inv, lcov)
-                vals += dummy
-            else:
-                pass
-
-        if np.sum(vals) != 0:
-            vals /= np.sum(vals)
+        elif p > 2 * threshold:
+            self.grid_vals = self.belief_vals
         else:
-            vals = self.target_grid_vals
-        self.belief_vals = vals
+            alpha = p / threshold - 1
+            self.grid_vals = self.target_grid_vals * (1-alpha) + self.belief_vals * alpha
+            self.grid_vals /= np.sum(self.grid_vals)
 
-        alpha = (p / (p + threshold)) ** 2
-        # print("alpha: ", alpha)
-        # self.grid_vals = (1 - alpha) * self.target_grid_vals + alpha * vals
-        # self.grid_vals /= np.sum(self.grid_vals)
-        self.grid_vals = vals
 
     def update3(self, nStates, nLandmark, observed_table, belief_means, belief_cov, threshold=1e-3):
         '''

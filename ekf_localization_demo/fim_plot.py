@@ -28,8 +28,8 @@ def fisher_mat(r, lm, cov_inv):
         return 0
     else:
         dm11 = (r[0]-lm[0]) * dist
-        dm21 = (r[1]-lm[1]) * dist
-        dm12 = 2*(r[0]-lm[0])*(r[1]-lm[1]) / (dist**2)
+        dm12 = (r[1]-lm[1]) * dist
+        dm21 = 2*(r[0]-lm[0])*(r[1]-lm[1]) / (dist**2)
         dm22 =-2*(r[0]-lm[0])*(r[1]-lm[1]) / (dist**2)
         dm = np.array([[dm11,dm12],[dm21,dm22]])
         fim = np.dot(np.dot(dm.T, cov_inv), dm)
