@@ -22,7 +22,7 @@ size = 20.0
 init_state = np.array([10., 10., 0.0])
 sensor_range = 4
 motion_noise = np.array([0.03, 0.03, 0.01])
-measure_noise = np.array([0.01, 0.01])
+measure_noise = np.array([0.005, 0.005])
 
 means = [np.array([14.5, 5.5]), np.array([4.5, 15.5])]
 vars = [np.array([1.1, 1.1])**2, np.array([1.1, 1.1])**2]

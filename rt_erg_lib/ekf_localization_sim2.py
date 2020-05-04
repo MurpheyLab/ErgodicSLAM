@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 from matplotlib import animation
 import autograd.numpy as np
-from .target_dist import TargetDist
 from .utils import *
 from tqdm import tqdm
 from numpy import sin, cos, sqrt
@@ -65,10 +64,13 @@ class simulation_slam():
             # generate control and measurement data
             #########################
             # this is what robot thinks it's doing
+            '''
             if debug:  # debug mode: robot runs a circle
-                ctrl = np.array([2.0, 0.5])
+                ctrl = np.array([2.5, 0.5])
             else:
-                ctrl = self.erg_ctrl_dr(mean)
+                ctrl = self.erg_ctrl_dr(mean[0:self.nStates])
+            '''
+            ctrl = self.erg_ctrl_dr(mean)
             state_dr = self.env_dr.step(ctrl)
             self.log['trajectory_dr'].append(state_dr)
 
@@ -85,7 +87,7 @@ class simulation_slam():
                 if (dist <= self.sensor_range):
                     true_landmarks.append(i)
                     noisy_observation = self.range_bearing(i, state_true, item)
-                    noisy_observation[1:] += self.measure_noise * np.random.randn(2)
+                    noisy_observation[1:] += self.measure_noise**2 * np.random.randn(2)
                     observations.append(noisy_observation)
             self.log['true_landmarks'].append(true_landmarks)
             self.log['observations'].append(np.array(observations))
@@ -133,9 +135,11 @@ class simulation_slam():
             # update target distribution and ergodic controller
             #########################
             # update target distribution with different update schemes
-            if update == 0:
+            if update == 0:# or debug:
                 self.log['target_dist'].append(self.erg_ctrl_dr.init_target_dist)
             else:
+                if update == -1:
+                    self.erg_ctrl_dr.target_dist.update0()
                 if update == 1:
                     self.erg_ctrl_dr.target_dist.update1(self.nStates, mean, cov, threshold=update_threshold)
                 if update == 2:
@@ -149,27 +153,28 @@ class simulation_slam():
         #######################
         # calculate and store ergodic metric during simulation
         #######################
-        print('processing ergodic metric ...')
-        xt_true = np.stack(self.log['trajectory_true'])
-        mean_est = np.stack(self.log['mean'])
-        xt_est = mean_est[:, 0:3]
+        if not debug:
+            print('processing ergodic metric ...')
+            xt_true = np.stack(self.log['trajectory_true'])
+            mean_est = np.stack(self.log['mean'])
+            xt_est = mean_est[:, 0:3]
 
-        for i in tqdm(range(self.tf)):
-            path_true = xt_true[:i+1, self.model_true.explr_idx]
-            ck_true = convert_traj2ck(self.erg_ctrl_true.basis, path_true)
-            erg_metric = self.erg_ctrl_dr.lamk * (ck_true - self.init_phik) ** 2
-            erg_metric = np.sum( erg_metric.reshape(1,-1) )
-            self.log['metric_true'].append(erg_metric)
+            for i in tqdm(range(self.tf)):
+                path_true = xt_true[:i+1, self.model_true.explr_idx]
+                ck_true = convert_traj2ck(self.erg_ctrl_true.basis, path_true)
+                erg_metric = self.erg_ctrl_dr.lamk * (ck_true - self.init_phik) ** 2
+                erg_metric = np.sum( erg_metric.reshape(1,-1) )
+                self.log['metric_true'].append(erg_metric)
 
-            path_est = xt_est[:i+1, self.model_true.explr_idx]
-            ck_est = convert_traj2ck(self.erg_ctrl_true.basis, path_est)
-            erg_metric = self.erg_ctrl_dr.lamk * (ck_est - self.init_phik) ** 2
-            erg_metric = np.sum( erg_metric.reshape(1,-1) )
-            self.log['metric_est'].append(erg_metric)
+                path_est = xt_est[:i+1, self.model_true.explr_idx]
+                ck_est = convert_traj2ck(self.erg_ctrl_true.basis, path_est)
+                erg_metric = self.erg_ctrl_dr.lamk * (ck_est - self.init_phik) ** 2
+                erg_metric = np.sum( erg_metric.reshape(1,-1) )
+                self.log['metric_est'].append(erg_metric)
 
-        self.log['metric_true'] = np.array(self.log['metric_true'])
-        self.log['metric_est'] = np.array(self.log['metric_est'])
-        self.log['metric_error'] = np.abs( self.log['metric_true'] - self.log['metric_est'] )
+            self.log['metric_true'] = np.array(self.log['metric_true'])
+            self.log['metric_est'] = np.array(self.log['metric_est'])
+            self.log['metric_error'] = np.abs( self.log['metric_true'] - self.log['metric_est'] )
 
         # return log for further visualization and evaluation
         print("simulation finished.")
@@ -374,8 +379,9 @@ class simulation_slam():
         plt.show()
         # return plt.gcf()
 
-    def animate(self, point_size=1, alpha=1, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
-        [xy, vals] = self.init_t_dist.get_grid_spec()
+    def animate(self, point_size=1, alpha=0.05, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
+        # [xy, vals] = self.init_t_dist.get_grid_spec()
+        [xy, vals] = self.t_dist.get_grid_spec(self.t_dist.belief_vals)
         plt.contourf(*xy, vals, levels=20)
         plt.scatter(self.landmarks[:, 0], self.landmarks[:, 1], color='white', marker='P')
         ax = plt.gca()
@@ -643,7 +649,7 @@ class simulation_slam():
         plt.show()
         # return anim
 
-    def new_animate3(self, point_size=1, alpha=1, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
+    def new_animate3(self, point_size=1, alpha=0.05, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
         fig = plt.gcf()
 
         ax1 = fig.add_subplot(131)

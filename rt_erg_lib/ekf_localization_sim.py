@@ -65,10 +65,13 @@ class simulation_slam():
             # generate control and measurement data
             #########################
             # this is what robot thinks it's doing
+            '''
             if debug:  # debug mode: robot runs a circle
                 ctrl = np.array([2.0, 0.5])
             else:
                 ctrl = self.erg_ctrl_dr(mean)
+            '''
+            ctrl = self.erg_ctrl_dr(mean)
             state_dr = self.env_dr.step(ctrl)
             self.log['trajectory_dr'].append(state_dr)
 

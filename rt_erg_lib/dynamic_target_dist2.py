@@ -94,15 +94,15 @@ class TargetDist(object):
             -0.5 * np.dot(np.dot((x - mean).T, np.linalg.inv(var)), (x - mean)))
         return p
 
-    def update0(self, nStates, belief_means, belief_vars):
-        pass
+    def update0(self):
+        self.grid_vals = self.belief_vals
 
     def update1(self, nStates, belief_means, belief_cov, threshold=1e-3):
         '''
         intuitive update: hard switch with FIM field
         '''
         p = np.linalg.det(belief_cov[0: nStates, 0: nStates])
-
+        print("p: ", p)
         if p < threshold:
             self.grid_vals = self.target_grid_vals # replace with "hard" switch
         else:
