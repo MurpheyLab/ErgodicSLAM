@@ -22,7 +22,7 @@ size = 15.0
 init_state = np.array([5., 5., 0.0])
 sensor_range = 2
 # motion_noise = np.array([0.02, 0.02, 0.01])
-motion_noise = np.array([0.02, 0.02, 0.001])
+motion_noise = np.array([0.02, 0.02, 0.005])
 measure_noise = np.array([0.005, 0.005])
 mcov = np.diag(measure_noise)
 
@@ -53,7 +53,7 @@ ergCtrlDR1.init_phik = convert_phi2phik(ergCtrlTrue1.basis, t_dist.grid_vals, t_
 
 erg_ctrl_sim1 = simulation_slam(size, init_state, t_dist, modelTrue1, ergCtrlTrue1, envTrue1, modelDR1, ergCtrlDR1, envDR1, tf, landmarks, sensor_range, motion_noise, measure_noise)
 
-log1 = erg_ctrl_sim1.start(report=True, debug=True, update=1, update_threshold=1e-5)
+log1 = erg_ctrl_sim1.start(report=True, debug=True, update=0, update_threshold=1e-5)
 erg_ctrl_sim1.animate(point_size=1, show_traj=True, title='EKF Localization Test')
 
 '''
