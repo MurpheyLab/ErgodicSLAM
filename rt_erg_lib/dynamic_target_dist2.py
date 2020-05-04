@@ -27,6 +27,7 @@ class TargetDist(object):
         self.landmarks = landmarks
         self.cov_inv = np.linalg.inv(mcov)
         self.sensor_range = sensor_range
+        self.switch_counter = 0 # comeback
 
         # self.means = [npr.uniform(0.2, 0.8, size=(2,))
         #                     for _ in range(num_nodes)]
@@ -104,9 +105,19 @@ class TargetDist(object):
         p = np.linalg.det(belief_cov[0: nStates, 0: nStates])
         print("p: ", p)
         if p < threshold:
-            self.grid_vals = self.target_grid_vals # replace with "hard" switch
+            if self.switch_counter == 0:
+                self.grid_vals = self.target_grid_vals
+            else:
+                if self.switch_counter < 50:
+                    self.switch_counter += 1
+                    self.grid_vals = self.belief_vals
+                else:
+                    self.grid_vals = self.target_grid_vals # replace with "hard" switch
+                    self.switch_counter = 0
         else:
             self.grid_vals = self.belief_vals
+            if self.switch_counter == 0:
+                self.switch_counter = 1
 
 
     def update2(self, nStates, belief_means, belief_cov, threshold=1e-3):

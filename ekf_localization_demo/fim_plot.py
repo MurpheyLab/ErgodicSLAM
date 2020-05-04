@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual_3.npy')
 
-num_pts = 50
+num_pts = 200
 size = 20
 
 temp_grid = np.meshgrid(*[np.linspace(0, size, num_pts) for _ in range(2)])

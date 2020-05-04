@@ -76,6 +76,7 @@ class simulation_slam():
 
             # this is what robot is actually doing (if we don't correct it)
             state_true = self.env_true.noisy_step(ctrl, self.motion_noise)
+            state_true[2] = normalize_angle(state_true[2])
             self.log['trajectory_true'].append(state_true)
 
             # observation model
@@ -87,7 +88,8 @@ class simulation_slam():
                 if (dist <= self.sensor_range):
                     true_landmarks.append(i)
                     noisy_observation = self.range_bearing(i, state_true, item)
-                    noisy_observation[1:] += self.measure_noise**2 * np.random.randn(2)
+                    # noisy_observation[1:] += self.measure_noise * np.random.randn(2)
+                    noisy_observation[1:] += np.random.normal(0, self.measure_noise)
                     observations.append(noisy_observation)
             self.log['true_landmarks'].append(true_landmarks)
             self.log['observations'].append(np.array(observations))
@@ -115,6 +117,9 @@ class simulation_slam():
 
             mean = predict_mean
             cov = predict_cov
+
+            print("true orie: ", state_true[2])
+            print("estm orie: ", mean[2])
 
             #########################
             # Record error and uncertainty for evaluation
@@ -230,8 +235,8 @@ class simulation_slam():
 
     def ekf_correction(self, predict_mean, predict_cov, z, Q):
         # initialize mean and cov
-        mean = predict_mean.copy()
-        cov = predict_cov.copy()
+        mean = predict_mean
+        cov = predict_cov
 
         # iterate each observed landmark
         for obs in z:
@@ -272,8 +277,12 @@ class simulation_slam():
             # update mean and covariance matrix
             diff_z = measurement - zi
             diff_z[1] = normalize_angle(diff_z[1])
+
+            '''
             if diff_z[1] > 3.14:
                 diff_z[1] = 2*pi - diff_z[1]
+            '''
+
             mean += np.dot(K, diff_z)
             cov -= np.dot(np.dot(K, H), cov)
 
@@ -379,9 +388,9 @@ class simulation_slam():
         plt.show()
         # return plt.gcf()
 
-    def animate(self, point_size=1, alpha=0.05, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
-        # [xy, vals] = self.init_t_dist.get_grid_spec()
-        [xy, vals] = self.t_dist.get_grid_spec(self.t_dist.belief_vals)
+    def animate(self, point_size=1, alpha=1, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
+        [xy, vals] = self.init_t_dist.get_grid_spec()
+        # [xy, vals] = self.t_dist.get_grid_spec(self.t_dist.belief_vals)
         plt.contourf(*xy, vals, levels=20)
         plt.scatter(self.landmarks[:, 0], self.landmarks[:, 1], color='white', marker='P')
         ax = plt.gca()
@@ -433,6 +442,9 @@ class simulation_slam():
 
                 agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
                 agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
+
+                # print("true orie: ", xt_true[i, 2])
+                # print("estm orie: ", xt_est[i, 2])
 
                 if plan:
                     agent_plan.set_offsets(np.array([[xt_plan[i, 0]], [xt_plan[i, 1]]]).T)
@@ -649,7 +661,7 @@ class simulation_slam():
         plt.show()
         # return anim
 
-    def new_animate3(self, point_size=1, alpha=0.05, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
+    def new_animate3(self, point_size=1, alpha=1, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
         fig = plt.gcf()
 
         ax1 = fig.add_subplot(131)

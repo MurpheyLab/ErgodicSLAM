@@ -75,7 +75,8 @@ class IntegratorSE2(object):
         '''
         Basic euler step with noise
         '''
-        self.state = self.state + self.f(self.state, a) * self.dt + noise**2 * np.random.randn(self.observation_space.shape[0])
+        # self.state = self.state + self.f(self.state, a) * self.dt + noise * np.random.randn(self.observation_space.shape[0])
+        self.state += self.f(self.state, a) * self.dt + np.random.normal(0, noise)
         return self.state.copy()
 
     def Gx(self, x, u):

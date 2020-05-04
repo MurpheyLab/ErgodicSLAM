@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/center_single.npy')
 
-num_pts = 50
+num_pts = 200
 size = 20
 
 temp_grid = np.meshgrid(*[np.linspace(0, size, num_pts) for _ in range(2)])
@@ -22,7 +22,7 @@ for lm in landmarks:
     grid_vals += mat11 * mat22 - mat12 * mat21
 '''
 
-def fisher_mat(r, lm, cov):
+def fisher_mat(r, lm, mcov):
     dist = sqrt( (r[0]-lm[0])**2 + (r[1]-lm[1])**2 )
     if dist > 4:
         return 0
@@ -33,19 +33,19 @@ def fisher_mat(r, lm, cov):
         dm22 =-2*(r[0]-lm[0])*(r[1]-lm[1]) / (dist**2)
         dm = np.array([[dm11,dm12],[dm21,dm22]])
 
-        cov_inv = np.linalg.inv(cov * dist**2)
+        mcov_inv = np.linalg.inv(mcov * dist**0.5)
 
-        fim = np.dot(np.dot(dm.T, cov_inv), dm)
+        fim = np.dot(np.dot(dm.T, mcov_inv), dm)
         # return np.linalg.det(fim)
         return np.trace(fim)
 
 cov = np.array([[0.01, 0],[0, 0.01]])
-cov_inv = np.linalg.inv(cov)
+# cov_inv = np.linalg.inv(cov)
 
 for i in range(grid.shape[0]):
     r = grid[i]
     for lm in landmarks:
-        grid_vals[i] += fisher_mat(r, lm, cov_inv)
+        grid_vals[i] += fisher_mat(r, lm, cov)
 
 xy = []
 for g in grid.T:
@@ -54,8 +54,8 @@ for g in grid.T:
     )
 vals = grid_vals.reshape(num_pts, num_pts)
 
-plt.contourf(*xy, vals, levels=20)
-plt.scatter(landmarks[:, 0], landmarks[:, 1], color='white', marker='P')
+plt.contourf(*xy, vals, levels=50)
+# plt.scatter(landmarks[:, 0], landmarks[:, 1], color='white', marker='P')
 ax = plt.gca()
 ax.set_aspect('equal', 'box')
 

@@ -60,13 +60,19 @@ def normalize_angle(angle):
     '''
     normalize angle into [-pi, pi]
     '''
+    '''
     normAngle = angle
-    while normAngle >= pi:
+    while normAngle > pi:
         normAngle -= 2*pi
     while normAngle < -pi:
         normAngle += 2*pi
 
     return normAngle
+    '''
+    return (angle + pi) % (2 * pi) - pi
+
+def normalize_angle2(angle):
+    return 0
 
 def multi_gaussian(x, mean, var):
     p = 1 / np.sqrt(np.linalg.det(2 * pi * var)) * np.exp(
