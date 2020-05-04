@@ -113,6 +113,14 @@ landmarks = np.concatenate((np.concatenate((landmarks1, landmarks2)), landmarks)
 
 np.save('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual_6.npy', landmarks)
 
+landmarks = np.array([[  2.0,  2.0],
+                      [  2.2,  1.8],
+                      [  1.8,  2.2],
+                      [ 12.8, 13.2],
+                      [ 13.2, 12.8],
+                      [ 13.0, 13.0]])
+np.save('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual_7.npy', landmarks)
+
 
 landmarks = np.array([[7., 8.],
                       [8., 7.]])

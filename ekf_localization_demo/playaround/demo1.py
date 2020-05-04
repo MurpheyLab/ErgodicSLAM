@@ -17,7 +17,7 @@ from math import pi
 # initialization
 ###################################
 
-tf = 1500
+tf = 2000
 size = 15.0
 init_state = np.array([5., 5., 0.0])
 sensor_range = 2
@@ -26,9 +26,9 @@ motion_noise = np.array([0.02, 0.02, 0.001])
 measure_noise = np.array([0.005, 0.005])
 mcov = np.diag(measure_noise)
 
-landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/uniform_2.npy')
+# landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/uniform_2.npy')
 # landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual_4.npy')
-# landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual_6.npy')
+landmarks = np.load('/home/msun/Code/ErgodicBSP/lm_dist_evaluation/cornered_dual_7.npy')
 
 means = [np.array([3.5, 11.5]), np.array([11.5, 3.5])]
 vars = [np.array([0.8, 0.8])**2, np.array([0.8, 0.8])**2]
@@ -53,7 +53,7 @@ ergCtrlDR1.init_phik = convert_phi2phik(ergCtrlTrue1.basis, t_dist.grid_vals, t_
 
 erg_ctrl_sim1 = simulation_slam(size, init_state, t_dist, modelTrue1, ergCtrlTrue1, envTrue1, modelDR1, ergCtrlDR1, envDR1, tf, landmarks, sensor_range, motion_noise, measure_noise)
 
-log1 = erg_ctrl_sim1.start(report=True, debug=True, update=0, update_threshold=1e-5)
+log1 = erg_ctrl_sim1.start(report=True, debug=True, update=1, update_threshold=1e-5)
 erg_ctrl_sim1.animate(point_size=1, show_traj=True, title='EKF Localization Test')
 
 '''

@@ -278,10 +278,6 @@ class simulation_slam():
             diff_z = measurement - zi
             diff_z[1] = normalize_angle(diff_z[1])
 
-            '''
-            if diff_z[1] > 3.14:
-                diff_z[1] = 2*pi - diff_z[1]
-            '''
 
             mean += np.dot(K, diff_z)
             cov -= np.dot(np.dot(K, H), cov)

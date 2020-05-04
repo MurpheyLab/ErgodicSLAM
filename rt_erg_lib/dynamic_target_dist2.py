@@ -110,6 +110,7 @@ class TargetDist(object):
             else:
                 if self.switch_counter < 50:
                     self.switch_counter += 1
+                    print(self.switch_counter)
                     self.grid_vals = self.belief_vals
                 else:
                     self.grid_vals = self.target_grid_vals # replace with "hard" switch
