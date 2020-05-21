@@ -110,6 +110,47 @@ class simulation():
         plt.show()
         # return anim
 
+    def animate2(self, point_size=1, show_label=False, show_traj=True, save=None, rate=50):
+        [xy, vals] = self.t_dist.get_grid_spec()
+        xt = np.stack(self.log['trajectory'])
+
+        fig = plt.figure()
+        # plt.contourf(*xy, vals, levels=20)
+        ax1 = fig.add_subplot(111)
+        ax1.set_aspect('equal', 'box')
+        ax1.set_xlim(-0.5, 15.5)
+        ax1.set_ylim(-0.5, 15.5)
+
+        xy = []
+        for g in self.grid.T:
+            xy.append(np.reshape(g, newshape=(50,50)))
+
+        def sub_animate(i):
+            ax1.clear()
+            # ax1.cla()
+            snapshot = self.ped_data[i]
+            peds = ax1.scatter(snapshot[:,0], snapshot[:,1],
+                               s=point_size, c='w')
+            if(show_traj):
+                points1 = ax1.scatter(xt[:i, 0], xt[:i, 1],
+                                      s=point_size, c='r')
+            else:
+                points1 = ax1.scatter([xt[i,0]], [xt[i,1]],
+                                      s=point_size, c='r')
+            ax1.contourf(*xy, self.log['dist_vals'][i].reshape(50,50),
+                         levels=25)
+            ret = [points1, peds]
+            return ret
+
+        anim = animation.FuncAnimation(fig, sub_animate, frames=self.tf, interval=(1000/rate), blit=True)
+        if save is not None:
+            Writer = animation.writers['ffmpeg']
+            writer = Writer(fps=40, metadata=dict(artist='simulation_slam'), bitrate=5000)
+            anim.save(save, writer=writer)
+        plt.show()
+        # return anim
+
+
     def path_reconstruct(self, save=None):
         xy, vals = self.t_dist.get_grid_spec()
         path = np.stack(self.log['trajectory'])[:self.tf, self.model.explr_idx]

@@ -1,8 +1,7 @@
 """
-this is the first version of testing ergodic control
-with crowd navigation
-test data in backed in sim_data_20.npy.bak and I will
-keep the parameters
+this is the 2nd version of testing ergodic control
+the 1st version is kept as a good reference, this version
+we can play with some parameters and new test data
 """
 
 import sys
