@@ -63,6 +63,7 @@ class RTErgodicControl(object):
         fdu = []
         dbar= []
         for t in range(self.horizon):
+            # print('t: ', t, '\tx: ', x)
             # collect all the information that is needed
             pred_traj.append(x[self.model.explr_idx])
             dfk.append(self.basis.dfk(x[self.model.explr_idx]))
@@ -83,7 +84,7 @@ class RTErgodicControl(object):
         # calculate the cks for the trajectory *** this is also in the utils file
         N = len(pred_traj)
         ck = np.sum([self.basis.fk(xt) for xt in pred_traj], axis=0) / N
-
+        # print('ck: ', len(pred_traj))
         self.ck = ck.copy()
         if ck_list is not None:
             ck_list[agent_num] = ck
@@ -104,6 +105,7 @@ class RTErgodicControl(object):
 
             self.u_seq[t] = -np.dot(np.dot(self.Rinv, fdu[t].T), rho)
             if (np.abs(self.u_seq[t]) > 1.0).any():
+            # if (np.abs(self.u_seq[t]) > 2.0).any():
                 self.u_seq[t] /= np.linalg.norm(self.u_seq[t])
 
         self.replay_buffer.push(state[self.model.explr_idx])
