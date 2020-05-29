@@ -41,10 +41,12 @@ class simulation():
 
         for t in tqdm(range(self.tf)):
             # ped data process
-            ped_state = self.ped_data[t]
-            dist_vals = self.distance_field5(self.grid, ped_state, self.space) + self.goal_vals
-            # dist_vals = self.goal_vals
-            self.erg_ctrl.phik = convert_phi2phik(self.erg_ctrl.basis,
+            # ped_state = self.ped_data[t]
+            if t == 0:
+                ped_state = self.ped_data[t]
+                dist_vals = self.distance_field5(self.grid, ped_state, self.space) + self.goal_vals
+                # dist_vals = self.goal_vals
+                self.erg_ctrl.phik = convert_phi2phik(self.erg_ctrl.basis,
                                                   dist_vals,
                                                   self.grid)
             # ergodic control
@@ -52,7 +54,8 @@ class simulation():
             state = self.env.step(ctrl)
             self.log['trajectory'].append(state)
             self.log['ped_state'].append(ped_state)
-            self.log['dist_vals'].append(dist_vals)
+            if t == 0:
+                self.log['dist_vals'].append(dist_vals)
         print("simulation finished.")
 
     def distance_field(self, grid, state):
@@ -84,7 +87,13 @@ class simulation():
         return dist_xy
 
     def plot(self, point_size=1, save=None):
-        [xy, vals] = self.t_dist.get_grid_spec()
+        xy = []
+        for g in self.grid.T:
+            xy.append(
+                np.reshape(g, newshape=(50, 50))
+        )
+        vals = self.log['dist_vals'][0].reshape(50, 50)
+
         plt.contourf(*xy, vals, levels=20)
         xt = np.stack(self.log['trajectory'])
         plt.scatter(xt[:self.tf, 0], xt[:self.tf, 1], s=point_size, c='red')
@@ -199,7 +208,13 @@ class simulation():
 
 
     def path_reconstruct(self, save=None):
-        xy, vals = self.t_dist.get_grid_spec()
+        xy = []
+        for g in self.grid.T:
+            xy.append(
+                np.reshape(g, newshape=(50, 50))
+        )
+
+        vals = self.log['dist_vals'][0].reshape(50, 50)
         path = np.stack(self.log['trajectory'])[:self.tf, self.model.explr_idx]
         ck = convert_traj2ck(self.erg_ctrl.basis, path)
         val = convert_ck2dist(self.erg_ctrl.basis, ck, size=self.size)
