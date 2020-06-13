@@ -151,8 +151,8 @@ class simulation_slam():
             # update target distribution and ergodic controller
             #########################
             # update target distribution with different update schemes
-            # self.erg_ctrl_dr.target_dist.update_fim(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, self.mcov_inv, threshold=update_threshold)
-            self.erg_ctrl_dr.target_dist.update_df(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+            self.erg_ctrl_dr.target_dist.update_fim(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, self.mcov_inv, threshold=update_threshold)
+            # self.erg_ctrl_dr.target_dist.update_df(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
             # update phi for ergodic controller
             self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals, self.erg_ctrl_dr.target_dist.grid)
             # record target distribution for replay and visualization

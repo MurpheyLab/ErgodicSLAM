@@ -18,7 +18,8 @@ tf = 2000
 size = 20.0
 # size = 25.0
 noise = 0.005
-init_state = np.array([11., 7., 0.0])
+# init_state = np.array([11., 7., 0.0])
+init_state = np.array([4., 5., 0.])
 envTrue = IntegratorSE2(size=size)
 modelTrue = IntegratorSE2(size=size)
 envDR = IntegratorSE2(size=size)
@@ -49,9 +50,9 @@ landmarks2 = np.random.uniform(0.5, 19.5, size=(8, 2))
 landmarks = np.concatenate((landmarks1, landmarks2))
 
 # lanmark distribution 2: gathered at two corners
-# landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
-# landmarks2 = np.random.uniform(2.0, 8.0, size=(10, 2))
-# landmarks = np.concatenate((np.concatenate((landmarks1, landmarks2)), landmarks))
+# landmarks1 = np.random.uniform(14.0, 18.0, size=(7, 2))
+# landmarks2 = np.random.uniform(2.0, 6.0, size=(8, 2))
+# landmarks = np.concatenate((landmarks1, landmarks2))
 
 # lanmark distribution 3: mixed distribution
 # landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
@@ -71,8 +72,8 @@ erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue,
 erg_ctrl_sim.start(report=True, debug=False, update=0)
 
 # erg_ctrl_sim.animate_eval(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
-# erg_ctrl_sim.animate2(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
-erg_ctrl_sim.animate(point_size=2, alpha=4, show_traj=True, title='Landmarks Distribution Test', rate=50)
+erg_ctrl_sim.animate2(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
+# erg_ctrl_sim.animate(point_size=2, alpha=4, show_traj=True, title='Landmarks Distribution Test', rate=50)
 
 erg_ctrl_sim.plot(point_size=1, save=None)
 erg_ctrl_sim.path_reconstruct(save=None)
