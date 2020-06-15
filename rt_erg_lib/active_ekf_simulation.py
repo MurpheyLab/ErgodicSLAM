@@ -42,7 +42,7 @@ class simulation_slam():
 
         self.init_phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.t_dist.target_grid_vals, self.t_dist.grid)
 
-    def start(self, report=False, debug=False, update=1, update_threshold=1e-3):
+    def start(self, report=False, debug=False, update=1, update_threshold=1e-3, snapshot=0):
         #########################
         # initialize mean and covariance matrix
         #########################
@@ -119,6 +119,11 @@ class simulation_slam():
             mean = predict_mean
             cov = predict_cov
 
+            if t == snapshot and snapshot!=0:
+                np.save('/home/msun/Code/ErgodicBSP/fisher_information_play/belief_mean_snapshot_t{}'.format(t), mean)
+                np.save('/home/msun/Code/ErgodicBSP/fisher_information_play/belief_cov_snapshot_t{}'.format(t), cov)
+                print("snapshot written!")
+
             #########################
             # Record error and uncertainty for evaluation
             #########################
@@ -135,6 +140,12 @@ class simulation_slam():
                 self.erg_ctrl_dr.target_dist.update_fim(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, self.mcov_inv, threshold=update_threshold)
             if update == 2:
                 self.erg_ctrl_dr.target_dist.update_df(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+            if update == 3:
+                if t > 50 and t < 250:
+                    self.erg_ctrl_dr.target_dist.update_df_3(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold, pos=np.array([10., 10.]))
+                else:
+                    self.erg_ctrl_dr.target_dist.update_df_2(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+
             # update phi for ergodic controller
             self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals, self.erg_ctrl_dr.target_dist.grid)
             # record target distribution for replay and visualization
@@ -561,6 +572,8 @@ class simulation_slam():
             sensor_point = ax1.plot([], [], color='orange')
             sensor_points.append(sensor_point)
 
+        self.ax3_cb = None
+
         def sub_animate(i):
             # visualize agent location / trajectory
             if (show_traj):
@@ -619,7 +632,7 @@ class simulation_slam():
             xy3, vals = t_dist.get_grid_spec()
             ax3.cla()
             ax3.set_title('Target Distribution')
-            ax3.contourf(*xy3, vals, levels=20)
+            ax3_countour = ax3.contourf(*xy3, vals, levels=20)
 
             # return matplotlib objects for animation
             ret = [points_true, agent_ellipse, points_est, agent_true, agent_est]

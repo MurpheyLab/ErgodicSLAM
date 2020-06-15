@@ -114,7 +114,7 @@ class TargetDist(object):
         for i in range(nLandmark):
             if observed_table[i] == 1:
                 lm = belief_means[2 + 2*i + 1 : 2 + 2*i + 3]
-                fish_mat_det = fisher_mat_broadcast(grid, lm, mcov_inv) * lm_cov_table[i]**2
+                fish_mat_det = fisher_mat_broadcast(grid, lm, mcov_inv) #* lm_cov_table[i]**2
                 vals += fish_mat_det
 
                 '''
@@ -161,5 +161,61 @@ class TargetDist(object):
         vals = dist_xy.max(axis = 0)
         if(np.sum(vals) != 0):
             vals /= np.sum(vals)
+        self.grid_vals = vals
+
+    def update_df_2(self, nStates, nLandmark, observed_table, belief_means, belief_cov, threshold=1e-3):
+        '''
+        update using uncertainty distance field (max)
+        '''
+        state = []
+        lm_det = []
+        for i in range(nLandmark):
+            if observed_table[i] == 1:
+                state.append(belief_means[2+2*i+1 : 2+2*i+3])
+                cov = belief_cov[3+2*i:5+2*i, 3+2*i:5+2*i]
+                lm_det.append(np.linalg.det(cov))
+        state = np.array(state)
+        lm_det = np.array(lm_det)
+
+        vals = np.zeros(self.grid.shape[0])
+        for i in range(self.grid.shape[0]):
+            r = self.grid[i]
+            for j in range(state.shape[0]):
+                l = state[j]
+                dist = np.sqrt((l[0]-r[0])**2 + (l[1]-r[1])**2)
+                vals[i] += np.exp(-dist) * (-np.log(lm_det[j]))
+        vals /= np.sum(vals)
+        self.grid_vals = vals
+
+    def update_df_3(self, nStates, nLandmark, observed_table, belief_means, belief_cov, threshold, pos):
+        '''
+        update using uncertainty distance field (max)
+        '''
+        state = []
+        lm_det = []
+        for i in range(nLandmark):
+            if observed_table[i] == 1:
+                state.append(belief_means[2+2*i+1 : 2+2*i+3])
+                cov = belief_cov[3+2*i:5+2*i, 3+2*i:5+2*i]
+                lm_det.append(np.linalg.det(cov))
+
+        state.append([10., 10.])
+        lm_det.append(1e-09)
+        state.append([12., 12.])
+        lm_det.append(1e-09)
+        state.append([14., 14.])
+        lm_det.append(1e-09)
+
+        state = np.array(state)
+        lm_det = np.array(lm_det)
+
+        vals = np.zeros(self.grid.shape[0])
+        for i in range(self.grid.shape[0]):
+            r = self.grid[i]
+            for j in range(state.shape[0]):
+                l = state[j]
+                dist = np.sqrt((l[0]-r[0])**2 + (l[1]-r[1])**2)
+                vals[i] += np.exp(-dist) * (-np.log(lm_det[j]))
+        vals /= np.sum(vals)
         self.grid_vals = vals
 
