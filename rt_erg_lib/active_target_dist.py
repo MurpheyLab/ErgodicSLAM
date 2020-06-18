@@ -187,9 +187,9 @@ class TargetDist(object):
         vals /= np.sum(vals)
         self.grid_vals = vals
 
-    def update_df_3(self, nStates, nLandmark, observed_table, belief_means, belief_cov, threshold, pos):
+    def update_df_3(self, nStates, nLandmark, observed_table, belief_means, belief_cov, threshold):
         '''
-        update using uncertainty distance field (max)
+        update using uncertainty distance field (fast implementation)
         '''
         state = []
         lm_det = []
@@ -198,24 +198,59 @@ class TargetDist(object):
                 state.append(belief_means[2+2*i+1 : 2+2*i+3])
                 cov = belief_cov[3+2*i:5+2*i, 3+2*i:5+2*i]
                 lm_det.append(np.linalg.det(cov))
-
-        state.append([10., 10.])
-        lm_det.append(1e-09)
-        state.append([12., 12.])
-        lm_det.append(1e-09)
-        state.append([14., 14.])
-        lm_det.append(1e-09)
-
         state = np.array(state)
         lm_det = np.array(lm_det)
 
-        vals = np.zeros(self.grid.shape[0])
-        for i in range(self.grid.shape[0]):
-            r = self.grid[i]
-            for j in range(state.shape[0]):
-                l = state[j]
-                dist = np.sqrt((l[0]-r[0])**2 + (l[1]-r[1])**2)
-                vals[i] += np.exp(-dist) * (-np.log(lm_det[j]))
+        if len(state) == 0:
+            print('no observation available.\n')
+            return
+
+        grid_x = self.grid[:, 0]
+        grid_y = self.grid[:, 1]
+        state_x = state[:, 0][:, np.newaxis]
+        state_y = state[:, 1][:, np.newaxis]
+        diff_x = grid_x - state_x
+        diff_y = grid_y - state_y
+        dist_xy = np.sqrt(diff_x**2 + diff_y**2)
+        dist_xy = np.exp(-dist_xy).T * ( -np.log(lm_det) )
+        vals = np.sum(dist_xy, axis=1)
+
+        vals /= np.sum(vals)
+        self.grid_vals = vals
+
+    def update_df_4(self, nStates, nLandmark, observed_table, belief_means, belief_cov, threshold, new_observed):
+        '''
+        update using uncertainty distance field (frontier exploration)
+        '''
+        state = []
+        lm_det = []
+        for i in range(nLandmark):
+            if observed_table[i] == 1:
+                state.append(belief_means[2+2*i+1 : 2+2*i+3])
+                cov = belief_cov[3+2*i:5+2*i, 3+2*i:5+2*i]
+                lm_det.append(np.linalg.det(cov))
+        state = np.array(state)
+        lm_det = np.array(lm_det)
+
+        if len(state) == 0:
+            print('no observation available.\n')
+            return
+
+        factor = np.ones(state.shape[0])
+        if new_observed is not None:
+            new_id = int( np.sum(observed_table[0:new_observed]) )
+            factor[new_id] = 4
+
+        grid_x = self.grid[:, 0]
+        grid_y = self.grid[:, 1]
+        state_x = state[:, 0][:, np.newaxis]
+        state_y = state[:, 1][:, np.newaxis]
+        diff_x = grid_x - state_x
+        diff_y = grid_y - state_y
+        dist_xy = np.sqrt(diff_x**2 + diff_y**2)
+        dist_xy = np.exp(-dist_xy).T * ( -np.log(lm_det) ) * factor
+        vals = np.sum(dist_xy, axis=1)
+
         vals /= np.sum(vals)
         self.grid_vals = vals
 

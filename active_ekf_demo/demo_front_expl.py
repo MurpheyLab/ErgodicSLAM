@@ -14,13 +14,13 @@ from math import sin, cos
 from math import pi
 
 """initialization"""
-tf = 500
+tf = 1500
 size = 20.0
 # size = 25.0
 noise = 0.005
 # init_state = np.array([11., 7., 0.0])
-# init_state = np.array([4., 5., 0.])
-init_state = np.array([10., 1., 0])
+init_state = np.array([4., 5., 0.])
+# init_state = np.array([10., 1., 0])
 envTrue = IntegratorSE2(size=size)
 modelTrue = IntegratorSE2(size=size)
 envDR = IntegratorSE2(size=size)
@@ -67,11 +67,13 @@ ergCtrlDR.init_phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist
 
 # squarely arranged landmarks
 landmarks = []
-for x in np.linspace(1, size-1, int(size/2)):
+intervals = np.linspace(1, size-1, int(size/2))
+for x in intervals:
     landmarks.append([x, 1])
     landmarks.append([x, size-1])
-    landmarks.append([1, x])
-    landmarks.append([size-1, x])
+    if x!=intervals[0] and x!=intervals[-1]:
+        landmarks.append([1, x])
+        landmarks.append([size-1, x])
 landmarks = np.array(landmarks)
 
 sensor_range = 4
@@ -81,14 +83,18 @@ motion_noise = np.array([0.2, 0.15, 0.1]) ** 2
 measure_noise = np.array([0.15, 0.1]) ** 2
 # measure_noise = np.array([1e-03, 1e-03]) ** 2
 erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise)
-erg_ctrl_sim.start(report=True, debug=False, update=2)
+erg_ctrl_sim.start(report=True, debug=False, update=4)
 
 
 erg_ctrl_sim.plot(point_size=1, save=None)
 
 erg_ctrl_sim.path_reconstruct(save=None)
 
-# erg_ctrl_sim.animate2(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
+erg_ctrl_sim.animate2(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
 
 erg_ctrl_sim.animate(point_size=2, alpha=4, show_traj=True, title='Landmarks Distribution Test', rate=50)
+
+erg_ctrl_sim.plot(point_size=1, save=None)
+
+erg_ctrl_sim.path_reconstruct(save=None)
 

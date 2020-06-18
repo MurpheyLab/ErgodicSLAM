@@ -38,6 +38,7 @@ class simulation_slam():
         self.Q = np.diag(measure_noise) ** 2
         self.mcov_inv = np.linalg.inv(self.Q)
         self.observed_landmarks = np.zeros(self.landmarks.shape[0])
+        self.new_observed = None
         self.threshold = 99999999
 
         self.init_phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.t_dist.target_grid_vals, self.t_dist.grid)
@@ -141,10 +142,12 @@ class simulation_slam():
             if update == 2:
                 self.erg_ctrl_dr.target_dist.update_df_2(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
             if update == 3:
-                if t > 50 and t < 250:
-                    self.erg_ctrl_dr.target_dist.update_df_3(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold, pos=np.array([10., 10.]))
+                self.erg_ctrl_dr.target_dist.update_df_3(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+            if update == 4:
+                if np.sum(self.observed_landmarks) < self.observed_landmarks.shape[0]:
+                    self.erg_ctrl_dr.target_dist.update_df_4(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold, new_observed=self.new_observed)
                 else:
-                    self.erg_ctrl_dr.target_dist.update_df_2(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+                    self.erg_ctrl_dr.target_dist.update_df_3(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
 
             # update phi for ergodic controller
             self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals, self.erg_ctrl_dr.target_dist.grid)
@@ -256,6 +259,7 @@ class simulation_slam():
             # if landmark not observed, initialize mean
             if (self.observed_landmarks[id] == 0):
                 self.observed_landmarks[id] = 1
+                self.new_observed = id
                 loc_x = mean[0] + measurement[0] * cos(mean[2] + measurement[1])
                 loc_y = mean[1] + measurement[0] * sin(mean[2] + measurement[1])
                 mean[2 + 2 * id + 1] = loc_x
@@ -676,9 +680,9 @@ class simulation_slam():
                     color='blue', marker='P')
 
         xt_true = np.stack(self.log['trajectory_true'])
-        traj_true = ax1.scatter(xt_true[:self.tf, 0], xt_true[:self.tf, 1], s=10, c='red')
+        traj_true = ax1.scatter(xt_true[:self.tf, 0], xt_true[:self.tf, 1], s=1, c='red')
         xt_est = np.stack(self.log['mean'])
-        traj_est = ax1.scatter(xt_est[:self.tf, 0], xt_est[:self.tf, 1], s=10, c='green')
+        traj_est = ax1.scatter(xt_est[:self.tf, 0], xt_est[:self.tf, 1], s=1, c='green')
 
         ax1.legend([traj_true, traj_est], ['True Path', 'Estimated Path'])
 
