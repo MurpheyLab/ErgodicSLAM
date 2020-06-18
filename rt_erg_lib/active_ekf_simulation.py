@@ -139,7 +139,7 @@ class simulation_slam():
             if update == 1:
                 self.erg_ctrl_dr.target_dist.update_fim(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, self.mcov_inv, threshold=update_threshold)
             if update == 2:
-                self.erg_ctrl_dr.target_dist.update_df(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+                self.erg_ctrl_dr.target_dist.update_df_2(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
             if update == 3:
                 if t > 50 and t < 250:
                     self.erg_ctrl_dr.target_dist.update_df_3(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold, pos=np.array([10., 10.]))
@@ -654,7 +654,43 @@ class simulation_slam():
 
 
     def path_reconstruct(self, save=None):
-        xy, vals = self.init_t_dist.get_grid_spec()
+        plt.clf()
+        plt.close()
+        fig = plt.figure()
+
+        ax1 = fig.add_subplot(221)
+        ax1.set_aspect('equal', 'box')
+        # ax1.scatter(self.landmarks[:, 0], self.landmarks[:, 1],
+        #             color='blue', marker='P')
+        ax1.set_title('Landmark Distribution')
+        ax1.set_xlim(0, self.size)
+        ax1.set_ylim(0, self.size)
+        #################################################
+
+        for i in range(self.landmarks.shape[0]):
+            if self.observed_landmarks[i] == 1:
+                ax1.scatter(self.landmarks[i, 0], self.landmarks[i, 1],
+                            color='orange', marker='P')
+            else:
+                ax1.scatter(self.landmarks[i, 0], self.landmarks[i, 1],
+                    color='blue', marker='P')
+
+        xt_true = np.stack(self.log['trajectory_true'])
+        traj_true = ax1.scatter(xt_true[:self.tf, 0], xt_true[:self.tf, 1], s=10, c='red')
+        xt_est = np.stack(self.log['mean'])
+        traj_est = ax1.scatter(xt_est[:self.tf, 0], xt_est[:self.tf, 1], s=10, c='green')
+
+        ax1.legend([traj_true, traj_est], ['True Path', 'Estimated Path'])
+
+        #################################################
+        ax2 = fig.add_subplot(222)
+        ax2.set_aspect('equal', 'box')
+        t_dist = self.log['target_dist'][-1]
+        xy, vals = t_dist.get_grid_spec()
+        ax2.set_title('Final Target Distribution')
+        ax2_countour = ax2.contourf(*xy, vals, levels=25)
+
+        xy, vals = self.t_dist.get_grid_spec()
 
         path_true = np.stack(self.log['trajectory_true'])[:self.tf, self.model_true.explr_idx]
         ck_true = convert_traj2ck(self.erg_ctrl_true.basis, path_true)
@@ -668,27 +704,12 @@ class simulation_slam():
         ck_est = convert_traj2ck(self.erg_ctrl_dr.basis, path_est)
         val_est = convert_ck2dist(self.erg_ctrl_dr.basis, ck_est, size=self.size)
 
-        plt.cla()
-        plt.clf()
-        plt.close()
-        fig = plt.figure()
+        ax3 = fig.add_subplot(223)
+        ax3.contourf(*xy, val_true.reshape(50, 50), levels=20)
+        ax3.set_aspect('equal', 'box')
+        ax3.set_title('Actual Path Statistics')
 
-        ax1 = fig.add_subplot(131)
-        ax1.contourf(*xy, vals, levels=20)
-        ax1.set_aspect('equal', 'box')
-        ax1.set_title('Spatial Distribution')
-
-        ax2 = fig.add_subplot(132)
-        ax2.contourf(*xy, val_true.reshape(50, 50), levels=20)
-        ax2.set_aspect('equal', 'box')
-        ax2.set_title('Actual Path Statistics')
-
-        # ax3 = fig.add_subplot(223)
-        # ax3.contourf(*xy, val_dr.reshape(50, 50), levels=20)
-        # ax3.set_aspect('equal', 'box')
-        # ax3.set_title('Dead Reckoning Path Statistics')
-
-        ax4 = fig.add_subplot(133)
+        ax4 = fig.add_subplot(224)
         ax4.contourf(*xy, val_est.reshape(50, 50), levels=20)
         ax4.set_aspect('equal', 'box')
         ax4.set_title('Estimated Path Statistics')

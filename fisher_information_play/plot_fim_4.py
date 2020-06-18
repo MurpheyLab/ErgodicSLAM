@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import multivariate_normal as mvn
 from tqdm import tqdm
 
-num_pts = 100
+num_pts = 50
 
 mean = np.load('belief_mean_snapshot_t50.npy')
 cov = np.load('belief_cov_snapshot_t50.npy')
@@ -91,22 +91,18 @@ for i in range(landmark_mean.shape[0]):
 '''
 vals = np.zeros(grid.shape[0])
 for k in range(landmark_mean.shape[0]):
-# for k in range(1):
     print("k: [{}/{}] --> pos: [{}, {}]".format(k, landmark_mean.shape[0], landmark_mean[k][0], landmark_mean[k][1]))
     temp_vals = np.zeros(grid.shape[0])
-    # for i in tqdm(range(grid.shape[0])):
-    for i in range(1):
-        # l = grid[i]
-        # l = np.array([10., 10.])
-        l = landmark_mean[k]
+    for i in tqdm(range(grid.shape[0])):
+        l = grid[i]
         for j in range(grid.shape[0]):
             r = grid[j]
             d = np.sqrt((r[0]-l[0])**2 + (r[1]-l[1])**2)
             if d <= 4 and d > 1e-06:
-                dm = np.array([[-(r[0]-l[0])/d, -(r[1]-l[1])/d],
-                               [(r[1]-l[1])/d**2, -(r[0]-l[0])/d**2]])
+                dm = np.array([[-(r[0]-l[0])/d, -(r[1]-l[1])/d, (r[0]-l[0])/d, (r[1]-l[1])/d],
+                               [(r[1]-l[1])/d**2, -(r[0]-l[0])/d**2, -(r[1]-l[1])/d**2, (r[0]-l[0])/d**2]])
                 fim = dm.T @ imcov @ dm
-                temp_vals[j] += np.linalg.det(fim) #* mvn.pdf(l, landmark_mean[k], landmark_cov[k])
+                temp_vals[j] += np.linalg.det(fim) * mvn.pdf(l, landmark_mean[k], landmark_cov[k])
                 # temp_vals[j] += np.linalg.det(fim) * mvn.pdf(l, landmark_mean[k], np.diag([1e-01, 5e-02])) # for debug only
             else:
                 pass
