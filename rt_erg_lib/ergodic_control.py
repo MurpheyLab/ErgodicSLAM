@@ -104,8 +104,8 @@ class RTErgodicControl(object):
             rho = rho - self.model.dt * (- edx - bdx - np.dot(fdx[t].T, rho))
 
             self.u_seq[t] = -np.dot(np.dot(self.Rinv, fdu[t].T), rho)
-            if (np.abs(self.u_seq[t]) > 1.0).any():
-            # if (np.abs(self.u_seq[t]) > 2.0).any():
+            # if (np.abs(self.u_seq[t]) > 1.0).any():
+            if (np.abs(self.u_seq[t]) > 2.0).any():
                 self.u_seq[t] /= np.linalg.norm(self.u_seq[t])
 
         self.replay_buffer.push(state[self.model.explr_idx])

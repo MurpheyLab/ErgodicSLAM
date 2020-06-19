@@ -3,12 +3,12 @@ Testing EKF-SLAM simulation
 """
 
 import sys
-sys.path.append("/Users/msun/Code/ErgodicBSP")
+sys.path.append("/home/msun/Code/ErgodicBSP")
 from rt_erg_lib.integrator_se2 import IntegratorSE2
 from rt_erg_lib.ergodic_control import RTErgodicControl
-from rt_erg_lib.dynamic_target_dist import TargetDist
+from rt_erg_lib.active_target_dist import TargetDist
 from rt_erg_lib.utils import *
-from rt_erg_lib.dynamic_target_simulation import simulation_slam
+from rt_erg_lib.active_ekf_simulation import simulation_slam
 import autograd.numpy as np
 from math import sin, cos
 from math import pi
@@ -18,7 +18,8 @@ tf = 1000
 size = 20.0
 # size = 25.0
 noise = 0.005
-init_state = np.array([11., 7., 0.0])
+# init_state = np.array([11., 7., 0.0])
+init_state = np.array([4., 5., 0.])
 envTrue = IntegratorSE2(size=size)
 modelTrue = IntegratorSE2(size=size)
 envDR = IntegratorSE2(size=size)
@@ -44,14 +45,14 @@ ergCtrlDR.init_phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist
 #                       [10.5, 9.5]])
 
 # lanmark distribution 1: uniform
-# landmarks1 = np.random.uniform(0.5, 19.5, size=(15, 2))
-# landmarks2 = np.random.uniform(0.5, 19.5, size=(15, 2))
-# landmarks = np.concatenate((landmarks1, landmarks2))
+landmarks1 = np.random.uniform(0.5, 19.5, size=(7, 2))
+landmarks2 = np.random.uniform(0.5, 19.5, size=(8, 2))
+landmarks = np.concatenate((landmarks1, landmarks2))
 
 # lanmark distribution 2: gathered at two corners
-# landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
-# landmarks2 = np.random.uniform(2.0, 8.0, size=(10, 2))
-# landmarks = np.concatenate((np.concatenate((landmarks1, landmarks2)), landmarks))
+# landmarks1 = np.random.uniform(14.0, 18.0, size=(7, 2))
+# landmarks2 = np.random.uniform(2.0, 6.0, size=(8, 2))
+# landmarks = np.concatenate((landmarks1, landmarks2))
 
 # lanmark distribution 3: mixed distribution
 # landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
@@ -59,20 +60,22 @@ ergCtrlDR.init_phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist
 # landmarks = np.concatenate((landmarks1, landmarks2))
 
 # read landmarks from file
-landmarks = np.load('/Users/msun/Code/ErgodicBSP/dynamic_target_demo/landmarks.npy')
+landmarks = np.load('landmarks_temp.npy')
+
+# np.save("landmarks_temp.npy", landmarks)
 
 sensor_range = 4
-motion_noise = np.array([0.3, 0.2, 0.1]) ** 2
+motion_noise = np.array([0.2, 0.15, 0.1]) ** 2
 # motion_noise = np.array([0.35, 0.25, 0.15]) ** 2
 # motion_noise = np.zeros(3)
-measure_noise = np.array([0.15, 0.15]) ** 2
+measure_noise = np.array([0.15, 0.1]) ** 2
 # measure_noise = np.array([1e-03, 1e-03]) ** 2
 erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise)
-erg_ctrl_sim.start(report=True, debug=False, update=0)
+erg_ctrl_sim.start(report=True, debug=False, update=3)
 
 # erg_ctrl_sim.animate_eval(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
-# erg_ctrl_sim.animate3(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
-erg_ctrl_sim.animate(point_size=2, alpha=4, show_traj=True, title='Landmarks Distribution Test', rate=50)
+erg_ctrl_sim.animate2(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
+# erg_ctrl_sim.animate(point_size=2, alpha=4, show_traj=True, title='Landmarks Distribution Test', rate=50)
 
 erg_ctrl_sim.plot(point_size=1, save=None)
-erg_ctrl_sim.path_reconstruct(save=None)
+# erg_ctrl_sim.path_reconstruct(save=None)
