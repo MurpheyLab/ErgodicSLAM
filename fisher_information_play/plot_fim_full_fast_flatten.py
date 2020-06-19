@@ -50,10 +50,12 @@ temp_grid = np.meshgrid(*[np.linspace(0, 20, num_pts) for _ in range(2)])
 grid = np.c_[temp_grid[0].ravel(), temp_grid[1].ravel()]
 
 """for debug only: make some data"""
+'''
 landmark_mean = np.array([[4., 4.],
                            [16., 16.]])
 landmark_cov = np.array([np.diag([0.001, 0.0004]),
                          np.diag([0.005, 0.001])]) * 10
+'''
 
 # start computation
 vals = np.zeros(grid.shape[0])
@@ -95,6 +97,8 @@ for i in range(landmark_mean.shape[0]):
 # for i in range(2):
 # for i in [1]:
     distr = mvn.pdf(grid, landmark_mean[i], landmark_cov[i])
+    # distr = np.log(distr + 1) * 100
+    distr = 10 / (1 + np.exp(-1000 * distr))
     scaled_det = det * distr[:, np.newaxis]
     det_vals = np.sum(scaled_det, axis=0)
     print("det_vals: ", np.sum(det_vals))
