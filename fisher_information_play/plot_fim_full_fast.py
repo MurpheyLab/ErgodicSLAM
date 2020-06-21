@@ -50,10 +50,12 @@ temp_grid = np.meshgrid(*[np.linspace(0, 20, num_pts) for _ in range(2)])
 grid = np.c_[temp_grid[0].ravel(), temp_grid[1].ravel()]
 
 """for debug only: make some data"""
+'''
 landmark_mean = np.array([[4., 4.],
                            [16., 16.]])
 landmark_cov = np.array([np.diag([0.001, 0.0004]),
-                         np.diag([0.005, 0.001])]) * 10
+                         np.diag([0.005, 0.001])]) * 1
+'''
 
 # start computation
 vals = np.zeros(grid.shape[0])
@@ -75,13 +77,10 @@ zero_flag = np.ones((num_pts**2, num_pts**2)) - np.eye(num_pts**2)
 
 dist_xy = dist_xy + 1e-09
 
-lm_x = grid[:,0]
-lm_y = grid[:,1]
-
-dm11 = -(grid_x - lm_x[:, np.newaxis]) / dist_xy * zero_flag
-dm12 = -(grid_y - lm_y[:, np.newaxis]) / dist_xy * zero_flag
-dm21 = (grid_y - lm_y[:, np.newaxis]) / dist_xy**2 * zero_flag
-dm22 = -(grid_x - lm_x[:, np.newaxis]) / dist_xy**2 * zero_flag
+dm11 = -(grid_x - grid_x[:, np.newaxis]) / dist_xy * zero_flag # grid_* one for robot, one for landmark
+dm12 = -(grid_y - grid_y[:, np.newaxis]) / dist_xy * zero_flag
+dm21 = (grid_y - grid_y[:, np.newaxis]) / dist_xy**2 * zero_flag
+dm22 = -(grid_x - grid_x[:, np.newaxis]) / dist_xy**2 * zero_flag
 
 fim11 = dm11 * (dm11*imcov[0,0] + dm21*imcov[1,0]) + dm21 * (dm11*imcov[0,1] + dm21*imcov[1,1])
 fim12 = dm12 * (dm11*imcov[0,0] + dm21*imcov[1,0]) + dm22 * (dm11*imcov[0,1] + dm21*imcov[1,1])
@@ -89,12 +88,13 @@ fim21 = dm11 * (dm12*imcov[0,0] + dm22*imcov[1,0]) + dm21 * (dm12*imcov[0,1] + d
 fim22 = dm12 * (dm12*imcov[0,0] + dm22*imcov[1,0]) + dm22 * (dm12*imcov[0,1] + dm22*imcov[1,1])
 
 det = fim11 * fim22 - fim12 * fim21
+# det = fim11 + fim22
 det = det * range_flag
 
 for i in range(landmark_mean.shape[0]):
 # for i in range(2):
 # for i in [1]:
-    distr = mvn.pdf(grid, landmark_mean[i], landmark_cov[i])
+    distr = mvn.pdf(grid, landmark_mean[i], landmark_cov[i] * 1)
     scaled_det = det * distr[:, np.newaxis]
     det_vals = np.sum(scaled_det, axis=0)
     print("det_vals: ", np.sum(det_vals))

@@ -4,7 +4,7 @@ import numpy as np
 import numpy.random as npr
 from math import pi
 from .utils import *
-from scipy.stats import multivariate_normal
+from scipy.stats import multivariate_normal as mvn
 
 
 class TargetDist(object):
@@ -133,6 +133,67 @@ class TargetDist(object):
         self.belief_vals = vals
 
         self.grid_vals = self.belief_vals
+
+    def update_fim_2(self, nStates, nLandmark, observed_table, belief_means, belief_cov, mcov_inv, threshold=1e-3):
+        # parse input
+        num_pts = int( np.sqrt(self.grid.shape[0]) )
+        imcov = mcov_inv
+        landmark_mean = []
+        landmark_cov = []
+        for i in range(nLandmark):
+            if observed_table[i] == 1:
+                mean = belief_means[nStates + 2 * i: nStates + 2 * i + 2]
+                cov = belief_cov[nStates + 2 * i: nStates + 2 * i + 2, nStates + 2 * i: nStates + 2 * i + 2]
+                landmark_mean.append(mean)
+                landmark_cov.append(cov)
+            else:
+                pass
+        landmark_mean = np.array(landmark_mean)
+        landmark_cov = np.array(landmark_cov)
+
+        # compute fim
+        vals = np.zeros(self.grid.shape[0])
+
+        grid_x = self.grid[:, 0]
+        grid_y = self.grid[:, 1]
+        diff_x = grid_x - grid_x[:, np.newaxis]
+        diff_y = grid_y - grid_y[:, np.newaxis]
+        dist_xy = np.sqrt(diff_x**2 + diff_y**2)
+
+        range_flag_1 = 0.0 < dist_xy
+        range_flag_1 = range_flag_1.astype(int)
+        range_flag_2 = dist_xy < 4.0
+        range_flag_2 = range_flag_2.astype(int)
+        range_flag = range_flag_1 * range_flag_2
+
+        zero_flag = np.ones((num_pts**2, num_pts**2)) - np.eye(num_pts**2)
+
+        dist_xy = dist_xy + 1e-09
+
+        dm11 = -(grid_x - grid_x[:, np.newaxis]) / dist_xy * zero_flag
+        dm12 = -(grid_y - grid_y[:, np.newaxis]) / dist_xy * zero_flag
+        dm21 = (grid_y - grid_y[:, np.newaxis]) / dist_xy**2 * zero_flag
+        dm22 = -(grid_x - grid_x[:, np.newaxis]) / dist_xy**2 * zero_flag
+
+        fim11 = dm11 * (dm11*imcov[0,0] + dm21*imcov[1,0]) + dm21 * (dm11*imcov[0,1] + dm21*imcov[1,1])
+        fim12 = dm12 * (dm11*imcov[0,0] + dm21*imcov[1,0]) + dm22 * (dm11*imcov[0,1] + dm21*imcov[1,1])
+        fim21 = dm11 * (dm12*imcov[0,0] + dm22*imcov[1,0]) + dm21 * (dm12*imcov[0,1] + dm22*imcov[1,1])
+        fim22 = dm12 * (dm12*imcov[0,0] + dm22*imcov[1,0]) + dm22 * (dm12*imcov[0,1] + dm22*imcov[1,1])
+
+        det = fim11 * fim22 - fim12 * fim21
+        det = det * range_flag
+
+        for i in range(landmark_mean.shape[0]):
+            distr = mvn.pdf(self.grid, landmark_mean[i], landmark_cov[i] * 50)
+            scaled_det = det * distr[:, np.newaxis]
+            det_vals = np.sum(scaled_det, axis=0)
+            vals += det_vals
+
+        vals_sum = np.sum(vals)
+        if vals_sum != 0:
+            vals /= vals_sum
+
+        self.grid_vals = vals
 
     def update_df(self, nStates, nLandmark, observed_table, belief_means, belief_cov, threshold=1e-3):
         '''

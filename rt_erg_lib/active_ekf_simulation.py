@@ -148,6 +148,8 @@ class simulation_slam():
                     self.erg_ctrl_dr.target_dist.update_df_4(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold, new_observed=self.new_observed)
                 else:
                     self.erg_ctrl_dr.target_dist.update_df_3(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, threshold=update_threshold)
+            if update == 5:
+                self.erg_ctrl_dr.target_dist.update_fim_2(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, self.mcov_inv, threshold=update_threshold)
 
             # update phi for ergodic controller
             self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals, self.erg_ctrl_dr.target_dist.grid)

@@ -22,14 +22,14 @@ class simulation():
 
         self.goal_vals = 0
         self.goals = goals
-        cov = np.array([1.2, 1.2])
+        cov = np.array([0.2, 0.2])
         if goals is not None:
             for mean in goals:
                 print("mean: ", mean)
                 innerds = np.sum((self.grid-mean)**2 / cov, 1)
                 self.goal_vals += np.exp(-innerds/2.0)
             self.goal_vals /= np.sum(self.goal_vals)
-            self.goal_vals *= 0.02
+            # self.goal_vals *= 0.02
 
 
     def start(self):
@@ -42,8 +42,10 @@ class simulation():
         for t in tqdm(range(self.tf)):
             # ped data process
             ped_state = self.ped_data[t]
-            dist_vals = self.distance_field5(self.grid, ped_state, self.space) + self.goal_vals
+            dist_vals = self.distance_field5(self.grid, ped_state, self.space)
+            # dist_vals += self.goal_vals
             # dist_vals = self.goal_vals
+            dist_vals /= np.sum(dist_vals)
             self.erg_ctrl.phik = convert_phi2phik(self.erg_ctrl.basis,
                                                   dist_vals,
                                                   self.grid)
@@ -55,19 +57,24 @@ class simulation():
             self.log['dist_vals'].append(dist_vals)
         print("simulation finished.")
 
-    def distance_field(self, grid, state):
+    def distance_field(self, grid, state, threshold=1.5):
         grid_x = grid[:,0]
         grid_y = grid[:,1]
         state_x = state[:,0][:, np.newaxis]
         state_y = state[:,1][:, np.newaxis]
         diff_x = grid_x - state_x
         diff_y = grid_y - state_y
-        diff_xy = np.sqrt(diff_x**2 + diff_y**2)
-        dist_xy = diff_xy.min(axis=0)
+        dist_xy = np.sqrt(diff_x**2 + diff_y**2)
 
-        return dist_xy
+        dist_flag = dist_xy > threshold
+        dist_flag = dist_xy.astype(int)
+        dist_xy *= dist_flag
 
-    def distance_field5(self, grid, state, space):
+        dist_val = dist_xy.min(axis=0)
+
+        return dist_val
+
+    def distance_field5(self, grid, state, space, threshold=0.5):
         start = time.time()
         grid_x = grid[:,0]
         grid_y = grid[:,1]
@@ -78,10 +85,15 @@ class simulation():
         state_y = np.concatenate((state[:,1], space_y))[:, np.newaxis]
         diff_x = grid_x - state_x
         diff_y = grid_y - state_y
-        diff_xy = np.sqrt(diff_x**2 + diff_y**2)
-        dist_xy = diff_xy.min(axis=0)
-        dist_xy /= np.sum(dist_xy)
-        return dist_xy
+        dist_xy = np.sqrt(diff_x**2 + diff_y**2)
+
+        dist_flag = dist_xy > threshold
+        dist_flag = dist_flag.astype(int)
+        dist_xy *= dist_flag
+
+        dist_val = dist_xy.min(axis=0)
+        dist_val /= np.sum(dist_val)
+        return dist_val
 
     def plot(self, point_size=1, save=None):
         [xy, vals] = self.t_dist.get_grid_spec()

@@ -7,7 +7,7 @@ this version updated distance field (including walls)
 """
 
 import sys
-sys.path.append('/Users/msun/Code/ErgodicBSP')
+sys.path.append('/home/msun/Code/ErgodicBSP')
 from rt_erg_lib.ergodic_control import RTErgodicControl
 from rt_erg_lib.target_dist import TargetDist
 from rt_erg_lib.utils import *
@@ -47,7 +47,7 @@ erg_ctrl.phik = convert_phi2phik(basis=erg_ctrl.basis,
                                  phi_val=t_dist.grid_vals,
                                  phi_grid=t_dist.grid)
 
-ped_data = np.load('/Users/msun/Code/ErgodicBSP/ped_sim/sim_data_10.npy')
+ped_data = np.load('/home/msun/Code/ErgodicBSP/ped_sim/sim_data_5.npy')
 
 
 space = [

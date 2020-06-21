@@ -29,7 +29,7 @@ class simulation():
                 innerds = np.sum((self.grid-mean)**2 / cov, 1)
                 self.goal_vals += np.exp(-innerds/2.0)
             self.goal_vals /= np.sum(self.goal_vals)
-            self.goal_vals *= 0.02
+            self.goal_vals *= 10.02
 
 
     def start(self):
@@ -44,8 +44,8 @@ class simulation():
             # ped_state = self.ped_data[t]
             if t == 0:
                 ped_state = self.ped_data[t]
-                dist_vals = self.distance_field5(self.grid, ped_state, self.space) + self.goal_vals
-                # dist_vals = self.goal_vals
+                # dist_vals = self.distance_field5(self.grid, ped_state, self.space) + self.goal_vals
+                dist_vals = self.goal_vals
                 self.erg_ctrl.phik = convert_phi2phik(self.erg_ctrl.basis,
                                                   dist_vals,
                                                   self.grid)
@@ -70,7 +70,7 @@ class simulation():
 
         return dist_xy
 
-    def distance_field5(self, grid, state, space):
+    def distance_field5(self, grid, state, space, dist_threshold=1.0):
         start = time.time()
         grid_x = grid[:,0]
         grid_y = grid[:,1]
@@ -81,10 +81,15 @@ class simulation():
         state_y = np.concatenate((state[:,1], space_y))[:, np.newaxis]
         diff_x = grid_x - state_x
         diff_y = grid_y - state_y
-        diff_xy = np.sqrt(diff_x**2 + diff_y**2)
-        dist_xy = diff_xy.min(axis=0)
-        dist_xy /= np.sum(dist_xy)
-        return dist_xy
+        dist_xy = np.sqrt(diff_x**2 + diff_y**2)
+
+        dist_flag = dist_xy > dist_threshold
+        dist_flag = dist_flag.astype(int)
+        dist_xy *= dist_flag
+
+        dist_val = dist_xy.min(axis=0)
+        dist_val /= np.sum(dist_val)
+        return dist_val
 
     def plot(self, point_size=1, save=None):
         xy = []
@@ -182,6 +187,8 @@ class simulation():
                 np.reshape(g, newshape=(50, 50))
         )
 
+        print("dist_vals shape: ", len(self.log['dist_vals']))
+
         def sub_animate(i):
             snapshot = self.ped_data[i]
             peds.set_offsets(snapshot[:,0:2])
@@ -193,7 +200,7 @@ class simulation():
             ax2.clear()
             # ax2.set_aspect('equal', 'box')
             ax2.plot(xt[i, 0], xt[i, 1], 'ro')
-            ax2.contourf(*xy, self.log['dist_vals'][i].reshape(50,50), levels=25)
+            ax2.contourf(*xy, self.log['dist_vals'][0].reshape(50,50), levels=25)
 
             ret = [points, peds]
             return ret
