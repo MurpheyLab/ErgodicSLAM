@@ -23,7 +23,6 @@ class simulation():
         for t in tqdm(range(self.tf)):
             start_time = time.time()
             ctrl = self.erg_ctrl(state)
-            print("ctrl: ", ctrl)
             state = self.env.step(ctrl)
             self.log['trajectory'].append(state)
             self.exec_times[t] = time.time()-start_time
@@ -34,7 +33,7 @@ class simulation():
 
     def plot(self, point_size=1):
         [xy, vals] = self.t_dist.get_grid_spec()
-        plt.contourf(xy[0], xy[1], vals, levels=20)
+        plt.contourf(*xy, vals, levels=20)
         xt = np.stack(self.log['trajectory'])
         plt.scatter(xt[:self.tf, 0], xt[:self.tf, 1], s=point_size, c='red')
         ax = plt.gca()

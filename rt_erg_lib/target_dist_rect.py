@@ -2,7 +2,6 @@
 
 import numpy as np
 import numpy.random as npr
-from scipy.stats import multivariate_normal as mvn
 
 class TargetDist(object):
     '''
@@ -16,14 +15,11 @@ class TargetDist(object):
 
         # TODO: create a message class for this
         # rospy.Subscriber('/target_distribution',  CLASSNAME, self.callback)
-        self.size = size
+
         self.num_pts = num_pts
-        grid = np.meshgrid(*[np.linspace(0, size[0], num_pts),
-                             np.linspace(0, 2., 20)])
-        self.xy = np.array([grid[0], grid[1]])
-        print("origin grid: ", grid[1])
+        grid = np.meshgrid(*[np.linspace(0, size[0], num_pts), np.linspace(0, size[1], num_pts)])
         self.grid = np.c_[grid[0].ravel(), grid[1].ravel()]
-        print("self.grid.shape: ", self.grid)
+
         # self.means = [npr.uniform(0.2, 0.8, size=(2,))
         #                     for _ in range(num_nodes)]
         # self.vars  = [npr.uniform(0.05, 0.2, size=(2,))**2
@@ -39,12 +35,10 @@ class TargetDist(object):
     def get_grid_spec(self):
         xy = []
         for g in self.grid.T:
-            print("g: ", g)
             xy.append(
-                np.reshape(g, newshape=(self.num_pts, int(self.num_pts*self.size[1]/self.size[0])))
+                np.reshape(g, newshape=(self.num_pts, self.num_pts))
             )
-        xy = np.array(xy)
-        return self.xy, self.grid_vals.reshape(20, self.num_pts)
+        return xy, self.grid_vals.reshape(self.num_pts, self.num_pts)
 
 
     def __call__(self, x):
@@ -53,10 +47,8 @@ class TargetDist(object):
 
         val = np.zeros(x.shape[0])
         for m, v in zip(self.means, self.vars):
-            # innerds = np.sum((x-m)**2 / v, 1)
-            # val += np.exp(-innerds/2.0) / np.sqrt((2*np.pi)**2 * np.prod(v))
-            val += mvn.pdf(x, m, np.diag(v))
+            innerds = np.sum((x-m)**2 / v, 1)
+            val += np.exp(-innerds/2.0) / np.sqrt((2*np.pi)**2 * np.prod(v))
         # normalizes the distribution
         val /= np.sum(val)
-        print("val: ", val)
         return val

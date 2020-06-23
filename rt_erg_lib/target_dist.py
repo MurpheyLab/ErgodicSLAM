@@ -12,12 +12,12 @@ class TargetDist(object):
 
     # 2020-03-01: add "size" parameter to support customizable exploration area size
     def __init__(self, num_pts, means, vars, size):
-        
-        # TODO: create a message class for this 
+
+        # TODO: create a message class for this
         # rospy.Subscriber('/target_distribution',  CLASSNAME, self.callback)
 
         self.num_pts = num_pts
-        grid = np.meshgrid(*[np.linspace(0, size, num_pts) for _ in range(2)])
+        grid = np.meshgrid(*[np.linspace(0, size, num_pts), np.linspace(0, 2, num_pts)])
         self.grid = np.c_[grid[0].ravel(), grid[1].ravel()]
 
         # self.means = [npr.uniform(0.2, 0.8, size=(2,))

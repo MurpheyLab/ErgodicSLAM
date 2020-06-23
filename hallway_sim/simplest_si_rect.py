@@ -19,7 +19,7 @@ t_dist = TargetDist(num_pts=num_pts, means=means, vars=vars, size=size)
 
 
 erg_ctrl = RTErgodicControl(model, t_dist, horizon=100, num_basis=15, batch_size=200)
-erg_ctrl.phik = convert_phi2phik(erg_ctrl.basis, t_dist.grid_vals, t_dist.grid, size=size, num_pts=num_pts)
+erg_ctrl.phik = convert_phi2phik(erg_ctrl.basis, t_dist.grid_vals, t_dist.grid)
 
 """start simulation"""
 tf = 500

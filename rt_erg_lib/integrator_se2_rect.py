@@ -3,14 +3,14 @@ from numpy import sin, cos
 from gym.spaces import Box
 
 class IntegratorSE2(object):
-    def __init__(self, size=np.array([1., 1.])):
+    def __init__(self, size):
         self.observation_space = Box(np.array([0., 0., 0.]),
                                      np.array([size[0], size[0], size[0]]),
                                      dtype=np.float32)
         print("observation_space.shape = ", self.observation_space.shape)
 
-        self.action_space = Box(np.array([-size[0], -size[1]]),
-                                np.array([size[0], size[1]]),
+        self.action_space = Box(np.array([-size[0], -size[0]]),
+                                np.array([size[0], size[0]]),
                                 dtype=np.float32)
 
         self.explr_space = Box(np.array([0., 0.]),
