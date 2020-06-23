@@ -5,7 +5,7 @@ from .replay_buffer import ReplayBuffer
 
 class RTErgodicControl(object):
 
-    def __init__(self, model, target_dist,
+    def __init__(self, model, target_dist, xd, P1,
                     weights=None, horizon=100, num_basis=5,
                     capacity=100000, batch_size=20):
 
@@ -15,6 +15,9 @@ class RTErgodicControl(object):
         self.horizon     = horizon
         self.replay_buffer = ReplayBuffer(capacity)
         self.batch_size    = batch_size
+        self.xd = np.array(xd)
+        print(self.xd)
+        self.P1 = np.array(P1)
 
         self.basis = Basis(self.model.explr_space, num_basis=num_basis)
 #         self.lamk  = 1.0/(np.linalg.norm(self.basis.k, axis=1) + 1)**(3.0/2.0)
@@ -27,8 +30,11 @@ class RTErgodicControl(object):
                         for _ in range(horizon)]
         if weights is None:
             weights = {'R' : np.eye(self.model.action_space.shape[0])}
-
-        self.Rinv = np.linalg.inv(weights['R'])
+            self.Q = 1
+        else:
+            self.weights = weights
+            self.Q = weights['Q']
+        self.Rinv = np.linalg.inv(self.weights['R'])
 
         self._phik = None
         self.ck = None
@@ -66,12 +72,14 @@ class RTErgodicControl(object):
             # print('t: ', t, '\tx: ', x)
             # collect all the information that is needed
             pred_traj.append(x[self.model.explr_idx])
+            xT = x.copy()
             dfk.append(self.basis.dfk(x[self.model.explr_idx]))
             fdx.append(self.model.fdx(x, self.u_seq[t]))
             fdu.append(self.model.fdu(x))
             dbar.append(self.barr.dx(x[self.model.explr_idx]))
             # step the model forwards
-            x = self.model.step(self.u_seq[t] * 0.)
+            x = self.model.step(self.u_seq[t] * 1.)
+
 
         # sample any past experiences
         if len(self.replay_buffer) > self.batch_size:
@@ -94,15 +102,18 @@ class RTErgodicControl(object):
         fourier_diff = fourier_diff.reshape(-1,1)
 
         # backwards pass
-        rho = np.zeros(self.model.observation_space.shape)
-        # print("rho.shape = ", rho.shape)
+        # rho = np.zeros(self.model.observation_space.shape)
+        # xT = pred_traj[-1]
+        # print("x(T) = ", pred_traj[-1])
+        # print("xd = ", self.xd)
+        rho = self.P1 @ (xT - self.xd)
         for t in reversed(range(self.horizon)):
             edx = np.zeros(self.model.observation_space.shape)
             edx[self.model.explr_idx] = np.sum(dfk[t] * fourier_diff, 0)
 
             bdx = np.zeros(self.model.observation_space.shape)
             bdx[self.model.explr_idx] = dbar[t]
-            rho = rho - self.model.dt * (- edx - bdx - np.dot(fdx[t].T, rho))
+            rho = rho - self.model.dt * (-self.Q*(edx+bdx) - np.dot(fdx[t].T, rho))
 
             self.u_seq[t] = -np.dot(np.dot(self.Rinv, fdu[t].T), rho)
             # if (np.abs(self.u_seq[t]) > 1.0).any():
