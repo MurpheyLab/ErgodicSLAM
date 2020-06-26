@@ -9,6 +9,7 @@ class Basis(object):
         if offset is not None:
             raise NotImplementedError('Have not implemented offsets')
         self.dl  = explr_space.high - explr_space.low
+        self.dl = np.array([explr_space.high[0], explr_space.high[0]])
         n = explr_space.shape[0]
         k = np.meshgrid(*[[i for i in range(num_basis)] for _ in range(n)])
 

@@ -15,7 +15,7 @@ model = IntegratorSE2(size=size)
 means = [np.array([4.5, 0.8]), np.array([8.6,1.2])]
 vars = [np.array([0.3, 0.3])**2, np.array([0.3,0.3])**2]
 t_dist = TargetDist(num_pts=50, means=means, vars=vars, size=size)
-erg_ctrl = RTErgodicControl(model, t_dist, horizon=50, num_basis=15, batch_size=100)
+erg_ctrl = RTErgodicControl(model, t_dist, horizon=100, num_basis=20, batch_size=100)
 erg_ctrl.phik = convert_phi2phik(erg_ctrl.basis, t_dist.grid_vals, t_dist.grid)
 
 """start simulation"""

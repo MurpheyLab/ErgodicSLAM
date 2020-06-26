@@ -50,7 +50,7 @@ def convert_ck2dist(basis, ck, grid=None, size=1.):
         # grid = np.meshgrid(*[np.linspace(0, 1.)
         #                         for _ in range(2)])
         grid = np.meshgrid(*[np.linspace(0, size),
-                             np.linspace(0, 2)])
+                             np.linspace(0, size)])
         grid = np.c_[grid[0].ravel(), grid[1].ravel()]
 
     val = np.stack([np.dot(basis.fk(x), ck) for x in grid])

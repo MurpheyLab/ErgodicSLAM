@@ -24,7 +24,7 @@ class DoubleIntegrator(object):
         #                        np.array([1.0, 1.0]),
         #                        dtype=np.float32 )
         self.explr_space = Box(np.array([0., 0.]),
-                               np.array([size, 2]),
+                               np.array([size, size]),
                                dtype=np.float32)
 
         self.explr_idx  = [0, 1]

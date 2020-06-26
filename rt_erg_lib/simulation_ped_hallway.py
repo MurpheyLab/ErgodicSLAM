@@ -18,7 +18,7 @@ class simulation():
         self.ped_data = ped_data
         self.space = space
         grid = np.meshgrid(*[np.linspace(0, size, 50),
-                             np.linspace(0, size, 50)])
+                             np.linspace(0, 2, 50)])
         self.grid = np.c_[grid[0].ravel(), grid[1].ravel()] # 2*N array
 
         self.goal_vals = 0
@@ -114,8 +114,8 @@ class simulation():
         # plt.contourf(*xy, vals, levels=20)
         ax = plt.gca()
         ax.set_aspect('equal', 'box')
-        ax.set_xlim(-0.1, self.size+0.1)
-        ax.set_ylim(-0.1, self.size+0.1)
+        ax.set_xlim(-0.5, 15.5)
+        ax.set_ylim(-0.5, 15.5)
 
         for boundary in self.space:
         	ax.scatter(boundary[:,0], boundary[:,1], s=5, c='k')
@@ -163,10 +163,10 @@ class simulation():
         fig = plt.figure()
 
         # plt.contourf(*xy, vals, levels=20)
-        ax = fig.add_subplot(121)
+        ax = fig.add_subplot(211)
         ax.set_aspect('equal', 'box')
-        ax.set_xlim(-0.1, self.size+0.1)
-        ax.set_ylim(-0.1, self.size+0.1)
+        ax.set_xlim(-0.1, 10.1)
+        ax.set_ylim(-0.1, 2.1)
 
         for boundary in self.space:
         	ax.scatter(boundary[:,0], boundary[:,1], s=5, c='k')
@@ -177,7 +177,7 @@ class simulation():
         points = ax.scatter([], [], s=point_size, c='r')
         peds = ax.scatter([], [], s=point_size, c='b')
 
-        ax2 = fig.add_subplot(122)
+        ax2 = fig.add_subplot(212)
         ax2.set_aspect('equal', 'box')
         points2 = ax2.scatter([], [], s=point_size, c='r')
         xy = []

@@ -3,7 +3,7 @@ Testing EKF-SLAM simulation
 """
 
 import sys
-sys.path.append("/Users/msun/Code/ErgodicBSP")
+sys.path.append("..")
 from rt_erg_lib.integrator_se2 import IntegratorSE2
 from rt_erg_lib.ergodic_control import RTErgodicControl
 from rt_erg_lib.target_dist import TargetDist
