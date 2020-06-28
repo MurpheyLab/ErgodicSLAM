@@ -49,7 +49,7 @@ class RTErgodicControl(object):
         self._phik = phik
 
 
-    def __call__(self, state, ck_list=None, agent_num=None):
+    def __call__(self, state, ck_list=None, agent_num=None, get_useq=False):
         assert self.phik is not None, 'Forgot to set phik, use set_target_phik method'
 
         self.u_seq[:-1] = self.u_seq[1:]
@@ -111,4 +111,7 @@ class RTErgodicControl(object):
 
         self.replay_buffer.push(state[self.model.explr_idx])
 
-        return self.u_seq[0].copy()
+        if get_useq is True:
+            return self.u_seq[0].copy(), self.u_seq
+        else:
+            return self.u_seq[0]

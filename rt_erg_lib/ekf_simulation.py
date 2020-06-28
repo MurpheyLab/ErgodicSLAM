@@ -368,7 +368,8 @@ class simulation_slam():
             if (show_traj):
                 points_true.set_offsets(np.array([xt_true[:i, 0], xt_true[:i, 1]]).T)
                 points_est.set_offsets(np.array([xt_est[:i, 0], xt_est[:i, 1]]).T)
-                # points_plan.set_offsets(np.array([xt_plan[:i, 0], xt_plan[:i, 1]]).T)
+                if plan:
+                    points_plan.set_offsets(np.array([xt_plan[:i, 0], xt_plan[:i, 1]]).T)
 
                 agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
                 agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
@@ -428,8 +429,7 @@ class simulation_slam():
 
             # return matplotlib objects for animation
             # ret = [points_true, points_dr, agent_ellipse, points_est]
-            ret = [points_true, agent_ellipse, points_est, agent_true, agent_est, agent_plan_ellipse, agent_plan,
-                   points_plan]
+            ret = [points_true, agent_ellipse, points_est, agent_true, agent_est, agent_plan_ellipse, agent_plan, points_plan]
             for item in sensor_points:
                 ret.append(item[0])
             for item in landmark_ellipses:
