@@ -7,11 +7,12 @@ from numpy import sin, cos, sqrt
 import math
 from math import pi
 from tempfile import TemporaryFile
+from scipy.optimize import minimize
 
 
 class simulation_slam():
     def __init__(self, size, init_state, t_dist, model_true, erg_ctrl_true, env_true, model_dr, erg_ctrl_dr, env_dr, tf,
-                 landmarks, sensor_range, motion_noise, measure_noise):
+                 landmarks, sensor_range, motion_noise, measure_noise, static_test=None):
         self.size = size
         self.init_state = init_state
         self.tf = tf
@@ -37,6 +38,8 @@ class simulation_slam():
         # self.threshold = 99999999
         self.threshold = 0.
 
+        self.static_test = static_test
+
     def start(self, report=False, debug=False):
         #########################
         # initialize mean and covariance matrix
@@ -61,7 +64,9 @@ class simulation_slam():
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
+        self.curr_t = 0
         for t in tqdm(range(self.tf)):
+            self.curr_t = t
             #########################
             # generate control and measurement data
             #########################
@@ -106,7 +111,16 @@ class simulation_slam():
             #########################
             # MPC Planning Test
             #########################
-            self.mpc_planning(mean, cov, ctrl, horizon=20)
+            if self.static_test is not None:
+                if self.static_test == t:
+                    self.mpc_planning(mean, cov, ctrl)
+                else:
+                    pass
+            else:
+                if self.static_test == 'all':
+                    self.mpc_planning(mean, cov, ctrl)
+                else:
+                    pass
 
             #########################
             # EKF SLAM
@@ -262,14 +276,32 @@ class simulation_slam():
 
         return mean, cov
 
-    def mpc_planning(self, mean, cov, ctrl, horizon):
+    def mpc_planning(self, mean, cov, ctrl, horizon=30):
         y_init = [np.concatenate((mean.reshape(-1), cov.reshape(-1), ctrl.reshape(-1)))]
+        mean_init = mean.copy()
+        cov_init = cov.copy()
         for i in range(horizon):
-            mean_init, cov_init = self.planning_prediction(mean, cov, ctrl, self.R, self.Q)
+            mean_init, cov_init = self.planning_prediction(mean_init, cov_init, ctrl, self.R, self.Q)
             y_init.append(np.concatenate((mean_init.reshape(-1), cov_init.reshape(-1), ctrl.reshape(-1))))
         y_init = np.array(y_init).reshape(-1)
-        cons = self.mpc_constraint(y_init, horizon)
-        print('cons: ', np.sum(cons))
+
+        cons = []
+        cons.append({'type':'eq', 'fun':lambda y:self.mpc_constraint(y, horizon)})
+        cons.append({'type':'eq', 'fun':lambda y:self.mpc_init_cond(y, y_init, horizon)})
+        objective = lambda y:self.mpc_objective(y, horizon)
+        res = minimize(objective, y_init, method='SLSQP', constraints=cons, options={'maxiter':1000, 'disp':True})
+        y_res = res.x.reshape(horizon+1, -1)
+        np.save('static_mean_t{}.npy'.format(self.curr_t), mean)
+        np.save('static_cov_t{}.npy'.format(self.curr_t), cov)
+        np.save('static_y_res_t{}.npy'.format(self.curr_t), y_res)
+        self.y_res = y_res
+
+    def mpc_init_cond(self, y, y_init, horizon):
+        new_y = y.reshape(horizon+1, -1)
+        new_x = new_y[0]
+        new_y_init = y_init.reshape(horizon+1, -1)
+        new_x_init = new_y_init[0]
+        return new_x - new_x_init
 
     def mpc_constraint(self, y, horizon):
         cons = []
@@ -292,8 +324,7 @@ class simulation_slam():
         for state in new_y:
             cov_flat = state[self.dim:-2]
             cov = cov_flat.reshape(self.dim, self.dim)
-        print("cov.shape: ", cov.shape)
-        obj = np.trace(cov)
+            obj += np.trace(cov)
         return obj
 
     # mpc-based implementaton of ekf-ml prediction,
@@ -743,3 +774,30 @@ class simulation_slam():
         plt.close()
 
         return fig
+
+    def static_test_plot(self, point_size=1, save=None):
+        if self.static_test is None:
+            return -1
+
+        # plot origin traj
+        [xy, vals] = self.t_dist.get_grid_spec()
+        plt.contourf(*xy, vals, levels=20)
+
+        xt_true = np.stack(self.log['trajectory_true'])
+        traj_true = plt.scatter(xt_true[:self.static_test, 0], xt_true[:self.static_test, 1], s=point_size, c='red')
+        xt_est = np.stack(self.log['mean'])
+        traj_est = plt.scatter(xt_est[:self.static_test, 0], xt_est[:self.static_test, 1], s=point_size, c='green')
+
+        plt.legend([traj_true, traj_est], ['True Path', 'Estimated Path'])
+
+        # deal with self.y_res
+        mpc_xt = self.y_res[:, 0:2]
+        plt.scatter(mpc_xt[:,0], mpc_xt[:,1], s=point_size, c='yellow')
+
+        # plot
+        ax = plt.gca()
+        ax.set_aspect('equal', 'box')
+        if save is not None:
+            plt.savefig(save)
+        plt.show()
+        # return plt.gcf()
