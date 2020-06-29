@@ -34,7 +34,8 @@ class simulation_slam():
         self.Q = np.diag(measure_noise) ** 2
         self.observed_landmarks = np.zeros(self.landmarks.shape[0])
         self.curr_obsv = []
-        self.threshold = 99999999
+        # self.threshold = 99999999
+        self.threshold = 0.
 
     def start(self, report=False, debug=False):
         #########################
@@ -101,6 +102,11 @@ class simulation_slam():
             self.log['planning_mean'].append(planning_predict_mean)
             self.log['planning_cov'].append(planning_predict_cov)
             print('mpc mean:\n', planning_predict_mean[0:3])
+
+            #########################
+            # MPC Planning Test
+            #########################
+            self.mpc_planning(mean, cov, ctrl, horizon=20)
 
             #########################
             # EKF SLAM
@@ -251,11 +257,44 @@ class simulation_slam():
             # update mean and covariance matrix
             diff_z = measurement - zi
             diff_z[1] = normalize_angle(diff_z[1])
-            print('diff_z:', diff_z)
             mean += np.dot(K, diff_z)
             cov -= np.dot(np.dot(K, H), cov)
 
         return mean, cov
+
+    def mpc_planning(self, mean, cov, ctrl, horizon):
+        y_init = [np.concatenate((mean.reshape(-1), cov.reshape(-1), ctrl.reshape(-1)))]
+        for i in range(horizon):
+            mean_init, cov_init = self.planning_prediction(mean, cov, ctrl, self.R, self.Q)
+            y_init.append(np.concatenate((mean_init.reshape(-1), cov_init.reshape(-1), ctrl.reshape(-1))))
+        y_init = np.array(y_init).reshape(-1)
+        cons = self.mpc_constraint(y_init, horizon)
+        print('cons: ', np.sum(cons))
+
+    def mpc_constraint(self, y, horizon):
+        cons = []
+        new_y = y.reshape(horizon+1, -1)
+        for i in range(horizon):
+            xt = new_y[i]
+            mean = xt[0:self.dim]
+            cov = xt[self.dim:-2].reshape(self.dim, self.dim)
+            ctrl = xt[-2:]
+            mean_tt, cov_tt = self.planning_prediction(mean, cov, ctrl, self.R, self.Q)
+            xtt = np.concatenate((mean_tt.reshape(-1), cov_tt.reshape(-1), ctrl.reshape(-1)))
+            diff = new_y[i+1] - xtt
+            for item in diff:
+                cons.append(item)
+        return np.array(cons)
+
+    def mpc_objective(self, y, horizon):
+        obj = 0
+        new_y = y.reshape(horizon+1, -1)
+        for state in new_y:
+            cov_flat = state[self.dim:-2]
+            cov = cov_flat.reshape(self.dim, self.dim)
+        print("cov.shape: ", cov.shape)
+        obj = np.trace(cov)
+        return obj
 
     # mpc-based implementaton of ekf-ml prediction,
     #   assume all landmarks observed at last time step
