@@ -38,8 +38,8 @@ ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid
 """start simulation"""
 tf = 100
 # lanmark distribution 1: uniform
-landmarks1 = np.random.uniform(0.5, 19.5, size=(10, 2))
-landmarks2 = np.random.uniform(0.5, 19.5, size=(10, 2))
+landmarks1 = np.random.uniform(0.5, 19.5, size=(2, 2))
+landmarks2 = np.random.uniform(0.5, 19.5, size=(3, 2))
 landmarks = np.concatenate((landmarks1, landmarks2))
 
 sensor_range = 4
@@ -49,6 +49,6 @@ measure_noise = np.array([0.1, 0.1]) ** 2
 # measure_noise = np.zeros(2)
 erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise)
 erg_ctrl_sim.start(report=True)
-erg_ctrl_sim.animate(point_size=1, show_traj=True, plan=False, title='Uniform Landmarks Distribution')
+erg_ctrl_sim.animate(point_size=1, show_traj=True, plan=True, title='Uniform Landmarks Distribution')
 erg_ctrl_sim.plot(point_size=1, save=None)
 erg_ctrl_sim.path_reconstruct(save=None)

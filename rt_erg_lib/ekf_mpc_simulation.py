@@ -96,28 +96,29 @@ class simulation_slam():
             # Planning prediction
             ########################
 
-            print('observations (before):\n', mean)
             planning_predict_mean, planning_predict_cov = self.planning_prediction(mean, cov, ctrl, self.R, self.Q)
+            planning_predict_mean[2] = normalize_angle(planning_predict_mean[2])
             self.log['planning_mean'].append(planning_predict_mean)
             self.log['planning_cov'].append(planning_predict_cov)
-            print('observations (after):\n', mean)
+            print('mpc mean:\n', planning_predict_mean[0:3])
 
             #########################
             # EKF SLAM
             #########################
             mean[2] = normalize_angle(mean[2])
-            mean, cov = self.ekf_slam_prediction(mean, cov, ctrl, self.R)
+            mean, cov = self.ekf_prediction(mean, cov, ctrl, self.R)
             mean[2] = normalize_angle(mean[2])
 
             mean,cov = self.ekf_correction(mean,cov, observations, self.Q)
             mean[2] = normalize_angle(mean[2])
+            print('est mean:', mean[0:3])
 
             self.log['mean'].append(mean)
             self.log['covariance'].append(cov)
 
             # mean = predict_mean
             # cov = predict_cov
-            print("current observation: ", self.curr_obsv)
+            # print("current observation: ", self.curr_obsv)
 
             #########################
             # Information for debug
@@ -137,26 +138,7 @@ class simulation_slam():
         bearing = normalize_angle(bearing)
         return np.array([id, range, bearing])
 
-    # def ekf_slam_prediction(self, mean, cov, ctrl, R):
-    #     # update mean
-    #     predict_mean = mean.copy()
-    #     predict_mean[0:self.nStates] += self.env_true.f(mean[0:self.nStates], ctrl) * self.env_true.dt
-    #
-    #     # update covariance matrix
-    #     Gx = self.env_true.Gx(mean[0:self.nStates], ctrl)
-    #     G = np.block([
-    #         [Gx, np.zeros((self.nStates, 2*self.nLandmark))],
-    #         [np.zeros((2*self.nLandmark, self.nStates)), np.eye(2*self.nLandmark)]
-    #     ])
-    #     R = np.block([
-    #         [self.R, np.zeros((self.nStates, 2*self.nLandmark))],
-    #         [np.zeros((2*self.nLandmark, self.nStates)), np.eye(2*self.nLandmark)]
-    #     ])
-    #     predict_cov = np.dot(np.dot(G, cov), G.T) + R
-    #
-    #     return predict_mean, predict_cov
-
-    def ekf_slam_prediction(self, mean, cov, ctrl, R):
+    def ekf_prediction(self, mean, cov, ctrl, R):
         # generate matrix F
         F = np.block([np.eye(self.nStates), np.zeros((self.nStates, 2 * self.nLandmark))])
 
@@ -226,6 +208,54 @@ class simulation_slam():
 
         return mean, cov
 
+    def ekf_correction_mpc(self, predict_mean, predict_cov, z, Q):
+        # initialize mean and cov
+        mean = predict_mean.copy()
+        cov = predict_cov.copy()
+
+        # iterate each observed landmark
+        for obs in z:
+            # extract measurement data
+            id = int(obs[0])
+            measurement = obs[1:]
+            # est_landmark = self.landmarks[id]
+            est_landmark = np.array([
+                    mean[0] + measurement[0] * cos(measurement[1]+mean[2]),
+                    mean[1] + measurement[0] * sin(measurement[1]+mean[2])
+                ])
+            # assume perfect observation,
+            #   so expected measurement is same as the input
+            delta = est_landmark - mean[0:2]
+            zi = self.range_bearing(id, mean[0:3], est_landmark)
+            zi = zi[1:]
+            q = zi[0] ** 2
+            q_sqrt = zi[0]
+            # generate matrix F
+            F = np.zeros((5, 3 + 2 * self.nLandmark))
+            F[0, 0] = 1
+            F[1, 1] = 1
+            F[2, 2] = 1
+            F[3, 2 + 2 * id + 1] = 1
+            F[4, 2 + 2 * id + 2] = 1
+            # calculate Jacobian matrix H of the measurement model
+            temp = np.array([
+                [-q_sqrt * delta[0], -q_sqrt * delta[1], 0, q_sqrt * delta[0], q_sqrt * delta[1]],
+                [delta[1], -delta[0], -q, -delta[1], delta[0]]
+            ])
+            H = (1 / zi[0] ** 2) * np.dot(temp, F)
+            # calculate Kalman gain: matrix K
+            mat1 = np.dot(cov, H.T)
+            mat2 = np.dot(np.dot(H, cov), H.T)
+            mat3 = np.linalg.inv(mat2 + Q)
+            K = np.dot(mat1, mat3)
+            # update mean and covariance matrix
+            diff_z = measurement - zi
+            diff_z[1] = normalize_angle(diff_z[1])
+            print('diff_z:', diff_z)
+            mean += np.dot(K, diff_z)
+            cov -= np.dot(np.dot(K, H), cov)
+
+        return mean, cov
 
     # mpc-based implementaton of ekf-ml prediction,
     #   assume all landmarks observed at last time step
@@ -235,21 +265,14 @@ class simulation_slam():
         # ekf predict
         predict_mean = mean.copy()
         predict_cov = cov.copy()
-        predict_mean, predict_cov = self.ekf_slam_prediction(predict_mean, predict_cov, ctrl, R)
+        predict_mean, predict_cov = self.ekf_prediction(predict_mean, predict_cov, ctrl, R)
 
-        # predict observation using maximum likelihood
-        observations = []
-        agent_mean = predict_mean[0: self.nStates]
-        for id in self.curr_obsv:
-            landmark_mean = predict_mean[2 + 2 * id + 1 : 2 + 2 * id + 2 + 1]
-            predict_observation = self.range_bearing(id, agent_mean, landmark_mean)
-            observations.append(predict_observation)
-
-        if len(observations) > 0:
-            # ekf correct
-            predict_mean, predict_cov = self.ekf_correction(predict_mean, predict_cov, observations, Q)
-        else:
-            pass
+        # ekf correction (assume perfect observation)
+        predict_obsv = []
+        for i in self.curr_obsv:
+            lm = self.landmarks[i]
+            predict_obsv.append(self.range_bearing(i, predict_mean[0:3], lm))
+        predict_mean, predict_cov = self.ekf_correction_mpc(predict_mean, predict_cov, predict_obsv, Q)
 
         # return
         return predict_mean, predict_cov
