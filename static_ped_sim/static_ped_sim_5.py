@@ -11,8 +11,8 @@ import numpy as np
 
 size = 20
 
-ped_state = np.load('sim_data_5.npy')
-ped_state = ped_state[250]
+ped_state = np.load('sim_data_10.npy')
+ped_state = ped_state[680]
 print(ped_state.shape)
 
 bounds = [
@@ -26,7 +26,7 @@ env = IntegratorSE2(size=size)
 model = IntegratorSE2(size=size)
 t_dist = TargetDist(num_pts=50, ped_state=ped_state, bounds=bounds, size=size)
 
-erg_ctrl = RTErgodicControl(model, t_dist, horizon=500, num_basis=100, batch_size=1000)
+erg_ctrl = RTErgodicControl(model, t_dist, horizon=100, num_basis=50, batch_size=500)
 erg_ctrl.phik = convert_phi2phik(erg_ctrl.basis, t_dist.grid_vals, t_dist.grid)
 
 
@@ -44,24 +44,38 @@ for t in tqdm(range(tf)):
 print('doneee')
 
 fig = plt.figure()
-ax1 = fig.add_subplot(121)
+ax1 = fig.add_subplot(131)
 ax1.set_xlim(0, size)
 ax1.set_ylim(0, size)
+ax1.set_title('Trajectory Plot')
 ax1.set_aspect('equal')
 
 xy, vals = t_dist.get_grid_spec()
 ax1.contourf(*xy, vals, levels=20)
 xt = np.stack(log['trajectory'])
 
-ax1.scatter(xt[:tf,0], xt[:tf,1], s=1)
+ax1.scatter(xt[:tf,0], xt[:tf,1], s=1, c='r')
 
-ax2 = fig.add_subplot(122)
+ax2 = fig.add_subplot(132)
 ax2.set_xlim(0, size)
 ax2.set_ylim(0, size)
+ax2.set_title('Fourier Reconstruction of Target Distribution')
 ax2.set_aspect('equal')
 
 phi = convert_phik2phi(erg_ctrl.basis, erg_ctrl.phik, t_dist.grid)
 ax2.contourf(*xy, phi.reshape(50,50), levels=20)
+
+ax3 = fig.add_subplot(133)
+ax3.set_xlim(0, size)
+ax3.set_ylim(0, size)
+ax3.set_title('Fourier Reconstruction of Trajectory')
+ax3.set_aspect('equal')
+
+path = np.stack(log['trajectory'])[:tf, model.explr_idx]
+ck = convert_traj2ck(erg_ctrl.basis, path)
+val = convert_ck2dist(erg_ctrl.basis, ck, size=size)
+ax3.contourf(*xy, val.reshape(50,50), levels=20)
+
 plt.show()
 
 

@@ -138,6 +138,9 @@ class simulation():
         fig = plt.gcf()
         points = ax.scatter([], [], s=point_size, c='r')
         peds = ax.scatter([], [], s=point_size, c='b')
+
+        sim_traj = ax.scatter([], [], s=point_size/4, c='g')
+
         def sub_animate(i):
             snapshot = self.ped_data[i]
             peds.set_offsets(snapshot[:,0:2])
@@ -145,6 +148,7 @@ class simulation():
                 points.set_offsets(np.array([xt[:i, 0], xt[:i, 1]]).T)
             else:
                 points.set_offsets(np.array([[xt[i, 0]], [xt[i, 1]]]).T)
+            sim_traj.set_offsets(self.log['agent_sim'][i][:, 0:2])
 
             if show_label:
                 cx = round(xt[i, 0], 2)
@@ -154,12 +158,12 @@ class simulation():
                 if i == self.tf-1:
                     quiver1.remove()
                     points.set_offsets(np.array([[xt[i, 0]], [xt[i, 1]]]).T)
-                    ret = [points, peds]
+                    ret = [sim_traj, points, peds]
                 else:
-                    ret = [points, peds, quiver1]
+                    ret = [sim_traj, points, peds, quiver1]
                 return ret
             else:
-                ret = [points, peds]
+                ret = [sim_traj, points, peds]
                 return ret
 
         anim = animation.FuncAnimation(fig, sub_animate, frames=self.tf, interval=(1000/rate), blit=True)
