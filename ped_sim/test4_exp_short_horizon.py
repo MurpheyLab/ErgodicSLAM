@@ -40,7 +40,7 @@ means = [np.array([8.5, 6.5]), np.array([6.5, 8.5]), np.array([6.2,5.8])]
 vars = [np.array([0.9,0.9])**2, np.array([0.7,0.7])**2, np.array([0.5,0.5])**2]
 t_dist = TargetDist(num_pts=50, means=means, vars=vars, size=size)
 # erg_ctrl = RTErgodicControl(model, t_dist, horizon=40, num_basis=20, batch_size=50) # last of last time
-erg_ctrl = RTErgodicControl(model, t_dist, horizon=500, num_basis=50, batch_size=1) # good one
+erg_ctrl = RTErgodicControl(model, t_dist, horizon=50, num_basis=50, batch_size=1) # good one
 # erg_ctrl = RTErgodicControl(model, t_dist, horizon=80, num_basis=25, batch_size=20)
 
 erg_ctrl.phik = convert_phi2phik(basis=erg_ctrl.basis,
