@@ -7,12 +7,11 @@ from numpy import sin, cos, sqrt
 import math
 from math import pi
 from tempfile import TemporaryFile
-from scipy.optimize import minimize
 
 
 class simulation_slam():
     def __init__(self, size, init_state, t_dist, model_true, erg_ctrl_true, env_true, model_dr, erg_ctrl_dr, env_dr, tf,
-                 landmarks, sensor_range, motion_noise, measure_noise, static_test=None):
+                 landmarks, sensor_range, motion_noise, measure_noise):
         self.size = size
         self.init_state = init_state
         self.tf = tf
@@ -34,11 +33,7 @@ class simulation_slam():
         self.measure_noise = measure_noise
         self.Q = np.diag(measure_noise) ** 2
         self.observed_landmarks = np.zeros(self.landmarks.shape[0])
-        self.curr_obsv = []
-        # self.threshold = 99999999
-        self.threshold = 0.
-
-        self.static_test = static_test
+        self.threshold = 99999999
 
     def start(self, report=False, debug=False):
         #########################
@@ -64,9 +59,7 @@ class simulation_slam():
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
-        self.curr_t = 0
         for t in tqdm(range(self.tf)):
-            self.curr_t = t
             #########################
             # generate control and measurement data
             #########################
@@ -85,7 +78,6 @@ class simulation_slam():
             # observation model
             true_landmarks = []
             observations = []
-            self.curr_obsv = []
             for i in range(self.nLandmark):
                 item = self.landmarks[i]
                 dist = sqrt((item[0] - state_true[0]) ** 2 + (item[1] - state_true[1]) ** 2)
@@ -94,51 +86,30 @@ class simulation_slam():
                     noisy_observation = self.range_bearing(i, state_true, item)
                     noisy_observation[1:] += self.measure_noise * np.random.randn(2)
                     observations.append(noisy_observation)
-                    self.curr_obsv.append(i)
             self.log['true_landmarks'].append(true_landmarks)
             self.log['observations'].append(np.array(observations))
 
             ########################
             # Planning prediction
             ########################
-
             planning_predict_mean, planning_predict_cov = self.planning_prediction(mean, cov, ctrl, self.R, self.Q)
-            planning_predict_mean[2] = normalize_angle(planning_predict_mean[2])
             self.log['planning_mean'].append(planning_predict_mean)
             self.log['planning_cov'].append(planning_predict_cov)
-            print('mpc mean:\n', planning_predict_mean[0:3])
-
-            #########################
-            # MPC Planning Test
-            #########################
-            if self.static_test is not None:
-                if self.static_test == t:
-                    self.mpc_planning(mean, cov, np.array([0., 0.]))
-                else:
-                    pass
-            else:
-                if self.static_test == 'all':
-                    self.mpc_planning(mean, cov, np.array([0., 0.]))
-                else:
-                    pass
 
             #########################
             # EKF SLAM
             #########################
             mean[2] = normalize_angle(mean[2])
-            mean, cov = self.ekf_prediction(mean, cov, ctrl, self.R)
-            mean[2] = normalize_angle(mean[2])
+            predict_mean, predict_cov = self.ekf_slam_prediction(mean, cov, ctrl, self.R)
+            predict_mean[2] = normalize_angle(predict_mean[2])
+            predict_mean, predict_cov = self.ekf_correction(predict_mean, predict_cov, observations, self.Q)
+            predict_mean[2] = normalize_angle(predict_mean[2])
 
-            mean,cov = self.ekf_correction(mean,cov, observations, self.Q)
-            mean[2] = normalize_angle(mean[2])
-            print('est mean:', mean[0:3])
+            self.log['mean'].append(predict_mean)
+            self.log['covariance'].append(predict_cov)
 
-            self.log['mean'].append(mean)
-            self.log['covariance'].append(cov)
-
-            # mean = predict_mean
-            # cov = predict_cov
-            # print("current observation: ", self.curr_obsv)
+            mean = predict_mean
+            cov = predict_cov
 
             #########################
             # Information for debug
@@ -158,7 +129,26 @@ class simulation_slam():
         bearing = normalize_angle(bearing)
         return np.array([id, range, bearing])
 
-    def ekf_prediction(self, mean, cov, ctrl, R):
+    # def ekf_slam_prediction(self, mean, cov, ctrl, R):
+    #     # update mean
+    #     predict_mean = mean.copy()
+    #     predict_mean[0:self.nStates] += self.env_true.f(mean[0:self.nStates], ctrl) * self.env_true.dt
+    #
+    #     # update covariance matrix
+    #     Gx = self.env_true.Gx(mean[0:self.nStates], ctrl)
+    #     G = np.block([
+    #         [Gx, np.zeros((self.nStates, 2*self.nLandmark))],
+    #         [np.zeros((2*self.nLandmark, self.nStates)), np.eye(2*self.nLandmark)]
+    #     ])
+    #     R = np.block([
+    #         [self.R, np.zeros((self.nStates, 2*self.nLandmark))],
+    #         [np.zeros((2*self.nLandmark, self.nStates)), np.eye(2*self.nLandmark)]
+    #     ])
+    #     predict_cov = np.dot(np.dot(G, cov), G.T) + R
+    #
+    #     return predict_mean, predict_cov
+
+    def ekf_slam_prediction(self, mean, cov, ctrl, R):
         # generate matrix F
         F = np.block([np.eye(self.nStates), np.zeros((self.nStates, 2 * self.nLandmark))])
 
@@ -228,129 +218,6 @@ class simulation_slam():
 
         return mean, cov
 
-    def ekf_correction_mpc(self, predict_mean, predict_cov, z, Q):
-        # initialize mean and cov
-        mean = predict_mean.copy()
-        cov = predict_cov.copy()
-
-        # iterate each observed landmark
-        for obs in z:
-            # extract measurement data
-            id = int(obs[0])
-            measurement = obs[1:]
-            # est_landmark = self.landmarks[id]
-            est_landmark = np.array([
-                    mean[0] + measurement[0] * cos(measurement[1]+mean[2]),
-                    mean[1] + measurement[0] * sin(measurement[1]+mean[2])
-                ])
-            # assume perfect observation,
-            #   so expected measurement is same as the input
-            delta = est_landmark - mean[0:2]
-            zi = self.range_bearing(id, mean[0:3], est_landmark)
-            zi = zi[1:]
-            q = zi[0] ** 2
-            q_sqrt = zi[0]
-            # generate matrix F
-            F = np.zeros((5, 3 + 2 * self.nLandmark))
-            F[0, 0] = 1
-            F[1, 1] = 1
-            F[2, 2] = 1
-            F[3, 2 + 2 * id + 1] = 1
-            F[4, 2 + 2 * id + 2] = 1
-            # calculate Jacobian matrix H of the measurement model
-            temp = np.array([
-                [-q_sqrt * delta[0], -q_sqrt * delta[1], 0, q_sqrt * delta[0], q_sqrt * delta[1]],
-                [delta[1], -delta[0], -q, -delta[1], delta[0]]
-            ])
-            H = (1 / zi[0] ** 2) * np.dot(temp, F)
-            # calculate Kalman gain: matrix K
-            mat1 = np.dot(cov, H.T)
-            mat2 = np.dot(np.dot(H, cov), H.T)
-            mat3 = np.linalg.inv(mat2 + Q)
-            K = np.dot(mat1, mat3)
-            # update mean and covariance matrix
-            diff_z = measurement - zi
-            diff_z[1] = normalize_angle(diff_z[1])
-            mean += np.dot(K, diff_z)
-            cov -= np.dot(np.dot(K, H), cov)
-
-        return mean, cov
-
-    def mpc_planning(self, mean, cov, ctrl, horizon=10):
-        y_init = [np.concatenate((mean.reshape(-1), cov.reshape(-1), ctrl.reshape(-1)))]
-        mean_init = mean.copy()
-        cov_init = cov.copy()
-        for i in range(horizon):
-            mean_init, cov_init = self.planning_prediction(mean_init, cov_init, ctrl, self.R, self.Q)
-            y_init.append(np.concatenate((mean_init.reshape(-1), cov_init.reshape(-1), ctrl.reshape(-1))))
-        y_init = np.array(y_init).reshape(-1)
-
-        cons = []
-        cons.append({'type':'eq', 'fun':lambda y:self.mpc_constraint(y, horizon)})
-        cons.append({'type':'eq', 'fun':lambda y:self.mpc_init_cond(y, y_init, horizon)})
-        objective = lambda y:self.mpc_objective(y, horizon)
-        res = minimize(objective, y_init, method='SLSQP', constraints=cons, options={'maxiter':1000, 'disp':True})
-        y_res = res.x.reshape(horizon+1, -1)
-        np.save('static_mean_t{}.npy'.format(self.curr_t), mean)
-        np.save('static_cov_t{}.npy'.format(self.curr_t), cov)
-        np.save('static_y_res_t{}.npy'.format(self.curr_t), y_res)
-        self.y_res = y_res
-
-    def mpc_init_cond(self, y, y_init, horizon):
-        new_y = y.reshape(horizon+1, -1)
-        new_x = new_y[0]
-        new_y_init = y_init.reshape(horizon+1, -1)
-        new_x_init = new_y_init[0]
-        return new_x - new_x_init
-
-    def mpc_constraint(self, y, horizon):
-        cons = []
-        new_y = y.reshape(horizon+1, -1)
-        for i in range(horizon):
-            xt = new_y[i]
-            mean = xt[0:self.dim]
-            cov = xt[self.dim:-2].reshape(self.dim, self.dim)
-            ctrl = xt[-2:]
-            mean_tt, cov_tt = self.planning_prediction(mean, cov, ctrl, self.R, self.Q)
-            xtt = np.concatenate((mean_tt.reshape(-1), cov_tt.reshape(-1), ctrl.reshape(-1)))
-            diff = new_y[i+1] - xtt
-            for item in diff:
-                cons.append(item)
-        return np.array(cons)
-
-    def mpc_objective(self, y, horizon):
-        obj = 0
-        new_y = y.reshape(horizon+1, -1)
-        for state in new_y:
-            cov_flat = state[self.dim:-2]
-            cov = cov_flat.reshape(self.dim, self.dim)
-            obj += np.trace(cov)
-        return obj
-
-    # mpc-based implementaton of ekf-ml prediction,
-    #   assume all landmarks observed at last time step
-    #	can be observed in the horizon (ensure continuity)
-    # '''
-    def planning_prediction(self, mean, cov, ctrl, R, Q):
-        # ekf predict
-        predict_mean = mean.copy()
-        predict_cov = cov.copy()
-        predict_mean, predict_cov = self.ekf_prediction(predict_mean, predict_cov, ctrl, R)
-
-        # ekf correction (assume perfect observation)
-        predict_obsv = []
-        for i in self.curr_obsv:
-            lm = self.landmarks[i]
-            predict_obsv.append(self.range_bearing(i, predict_mean[0:3], lm))
-        predict_mean, predict_cov = self.ekf_correction_mpc(predict_mean, predict_cov, predict_obsv, Q)
-
-        # return
-        return predict_mean, predict_cov
-    # '''
-
-    # old implementaton of ekf-ml prediction,
-    #   has discontinuity for observation
-    '''
     def planning_prediction(self, mean, cov, ctrl, R, Q):
         # ekf predict
         predict_mean = mean.copy()
@@ -375,7 +242,6 @@ class simulation_slam():
 
         # return
         return predict_mean, predict_cov
-    '''
 
     def generate_ellipse(self, x, y, theta, a, b):
         NPOINTS = 100
@@ -471,9 +337,8 @@ class simulation_slam():
         points_est = ax.scatter([], [], s=point_size, color='green')
         agent_est = ax.scatter([], [], s=point_size * 100, color='green', marker='8')
 
-        if plan:
-            mean_plan = np.stack(self.log['planning_mean'])
-            xt_plan = mean_plan[:, 0:3]
+        mean_plan = np.stack(self.log['planning_mean'])
+        xt_plan = mean_plan[:, 0:3]
         points_plan = ax.scatter([], [], s=point_size, color='yellow')
         agent_plan = ax.scatter([], [], s=point_size * 100, color='yellow', marker='8')
 
@@ -774,30 +639,3 @@ class simulation_slam():
         plt.close()
 
         return fig
-
-    def static_test_plot(self, point_size=1, save=None):
-        if self.static_test is None:
-            return -1
-
-        # plot origin traj
-        [xy, vals] = self.t_dist.get_grid_spec()
-        plt.contourf(*xy, vals, levels=20)
-
-        xt_true = np.stack(self.log['trajectory_true'])
-        traj_true = plt.scatter(xt_true[:self.static_test, 0], xt_true[:self.static_test, 1], s=point_size, c='red')
-        xt_est = np.stack(self.log['mean'])
-        traj_est = plt.scatter(xt_est[:self.static_test, 0], xt_est[:self.static_test, 1], s=point_size, c='green')
-
-        plt.legend([traj_true, traj_est], ['True Path', 'Estimated Path'])
-
-        # deal with self.y_res
-        mpc_xt = self.y_res[:, 0:2]
-        plt.scatter(mpc_xt[:,0], mpc_xt[:,1], s=point_size, c='yellow')
-
-        # plot
-        ax = plt.gca()
-        ax.set_aspect('equal', 'box')
-        if save is not None:
-            plt.savefig(save)
-        plt.show()
-        # return plt.gcf()

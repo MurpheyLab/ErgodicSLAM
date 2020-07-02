@@ -330,23 +330,9 @@ class simulation_slam():
     # mpc-based implementaton of ekf-ml prediction,
     #   assume all landmarks observed at last time step
     #	can be observed in the horizon (ensure continuity)
-    # '''
     def planning_prediction(self, mean, cov, ctrl, R, Q):
-        # ekf predict
-        predict_mean = mean.copy()
-        predict_cov = cov.copy()
-        predict_mean, predict_cov = self.ekf_prediction(predict_mean, predict_cov, ctrl, R)
-
-        # ekf correction (assume perfect observation)
-        predict_obsv = []
-        for i in self.curr_obsv:
-            lm = self.landmarks[i]
-            predict_obsv.append(self.range_bearing(i, predict_mean[0:3], lm))
-        predict_mean, predict_cov = self.ekf_correction_mpc(predict_mean, predict_cov, predict_obsv, Q)
-
-        # return
-        return predict_mean, predict_cov
-    # '''
+        # predict
+        pass
 
     # old implementaton of ekf-ml prediction,
     #   has discontinuity for observation
