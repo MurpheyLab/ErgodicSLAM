@@ -8,6 +8,7 @@ import math
 from math import pi
 from tempfile import TemporaryFile
 from scipy.optimize import minimize
+from time import time
 
 
 class simulation_slam():
@@ -332,6 +333,7 @@ class simulation_slam():
     #	can be observed in the horizon (ensure continuity)
     # '''
     def planning_prediction(self, mean, cov, ctrl, R, Q):
+        start = time()
         # ekf predict
         predict_mean = mean.copy()
         predict_cov = cov.copy()
@@ -343,6 +345,8 @@ class simulation_slam():
             lm = self.landmarks[i]
             predict_obsv.append(self.range_bearing(i, predict_mean[0:3], lm))
         predict_mean, predict_cov = self.ekf_correction_mpc(predict_mean, predict_cov, predict_obsv, Q)
+
+        print("elapsed time: ", time()-start)
 
         # return
         return predict_mean, predict_cov

@@ -327,12 +327,41 @@ class simulation_slam():
             obj += np.trace(cov)
         return obj
 
+    def useless(self):
+        pass
+
     # mpc-based implementaton of ekf-ml prediction,
     #   assume all landmarks observed at last time step
     #	can be observed in the horizon (ensure continuity)
-    def planning_prediction(self, mean, cov, ctrl, R, Q):
-        # predict
-        pass
+     def planning_prediction(self, input_mean, input_cov, ctrl, R, Q, obsv_table):
+         # copy
+         mean = input_mean.copy()
+         cov = input_cov.copy()
+         
+         # predict
+         g = np.zeros(self.dim)
+         g[0] = cos(mean[2]) * ctrl[0]
+         g[1] = sin(mean[2]) * ctrl[0]
+         mean += g * 0.1
+ 
+         G = np.zeros((self.dim, self.dim))
+         G[0][2] = -sin(mean[2]) * ctrl[0]
+         G[1][2] =  cos(mean[2]) * ctrl[0]
+         BigR = np.block([
+                 [R, np.zeros((self.nStates, self.nLandmarks))],
+                 [np.zeros((self.nLandmarks, self.nStates)), np.zeros((self.nLandmarks, self.nLandmarks))]
+             ])
+         cov = G.T @ cov @ G + BigR
+ 
+         # correction
+         num_obsv = len(obsv_table)
+         H = np.zeros((2*num_obsv, self.dim))
+         for i in range(num_obsv):
+             idx = 2*i
+             H[idx][]
+ 
+         # return
+         return mean, cov
 
     # old implementaton of ekf-ml prediction,
     #   has discontinuity for observation

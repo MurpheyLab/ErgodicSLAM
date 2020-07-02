@@ -73,6 +73,6 @@ goals = np.array([
 tf = 500
 erg_ctrl_sim = simulation(size, init_state, model, erg_ctrl, env, tf, ped_data=ped_data, space=space, goals=goals)
 erg_ctrl_sim.start()
-erg_ctrl_sim.animate2(point_size=20, show_traj=False, rate=20)
+erg_ctrl_sim.animate(point_size=20, show_traj=False, rate=20)
 # erg_ctrl_sim.plot(point_size=1)
 # erg_ctrl_sim.path_reconstruct()
