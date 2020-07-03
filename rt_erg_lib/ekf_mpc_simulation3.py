@@ -64,13 +64,14 @@ class simulation_slam():
 
         self.curr_t = 0
         for t in tqdm(range(self.tf)):
+            print('\nmean(before): ', mean[0:3])
             self.curr_t = t
             #########################
             # generate control and measurement data
             #########################
             # this is what robot thinks it's doing
             if debug:  # debug mode: robot runs a circle
-                ctrl = np.array([2.0, 0.5])
+                ctrl = np.array([2.2, 0.4])
             else:
                 ctrl = self.erg_ctrl_dr(mean[0:self.nStates])
             state_dr = self.env_dr.step(ctrl)
@@ -143,11 +144,18 @@ class simulation_slam():
             #########################
 
             # process model for ekf prediction
+            '''
+            mean[2] = normalize_angle(mean[2])
             g = np.zeros(mean.shape[0])
             g[0] = cos(mean[2]) * ctrl[0]
             g[1] = sin(mean[2]) * ctrl[0]
             g[2] = ctrl[1]
             mean += g * 0.1
+            '''
+            g = self.env_dr.f(mean[0:3], ctrl)
+            mean[0:3] = mean[0:3] + g * 0.1
+            print('mean(now): ', mean[0:3])
+            print('state(true): ', state_true)
 
             G = np.zeros((mean.shape[0], mean.shape[0]))
             G[0][2] = -sin(mean[2]) * ctrl[0]
@@ -162,7 +170,7 @@ class simulation_slam():
             # use observations for ekf correction
             num_obsv = len(self.curr_obsv)
             H = np.zeros((2*num_obsv, mean.shape[0]))
-            r = mean[0:3]
+            r = mean[0:3].copy()
             lm_id = np.array(self.lm_id)
             ref_observations = []
             for i in range(num_obsv):
@@ -190,17 +198,18 @@ class simulation_slam():
 
             K = cov @ H.T @ np.linalg.inv(H @ cov @ H.T + BigQ)
             delta_z = observations - ref_observations
-            delta_z[:,1] = normalize_angle(delta_z[:,1])
-            delta_z = delta_z.reshape(-1)
-
-            mean += K @ delta_z
+            if len(delta_z) == 0:
+                pass
+            else:
+                delta_z[:,1] = normalize_angle(delta_z[:,1])
+                delta_z = delta_z.reshape(-1)
+                mean += K @ delta_z
             cov = cov - K @ H @ cov
-            print('cov.shape: ', cov.shape)
 
-            print('mean: ', mean[0:3])
-            self.log['mean'].append(mean)
-            self.log['trajectory_slam'].append(mean[0:3])
-            self.log['covariance'].append(cov)
+            print('mean(again): ', mean[0:3], end='\n\n')
+            self.log['mean'].append(mean.copy())
+            self.log['trajectory_slam'].append(mean[0:3].copy())
+            self.log['covariance'].append(cov.copy())
 
             #########################
             # Information for debug
@@ -225,123 +234,6 @@ class simulation_slam():
         lm_y = agent[1] + obsv[0] * sin(agent[2] + obsv[1])
         return np.array([lm_x, lm_y])
 
-    def ekf_prediction(self, mean, cov, ctrl, R):
-        # generate matrix F
-        F = np.block([np.eye(self.nStates), np.zeros((self.nStates, 2 * self.nLandmark))])
-
-        # update predicted mean
-        predict_mean = mean.copy()
-        predict_mean[0:self.nStates] += self.env_true.f(mean[0:self.nStates], ctrl) * self.env_true.dt
-
-        # calculate matrix G for updating predicted covariance matrix
-        Jacobian = np.array([[0, 0, -sin(mean[2]) * ctrl[0] * self.env_true.dt],
-                             [0, 0, cos(mean[2]) * ctrl[0] * self.env_true.dt],
-                             [0, 0, 0]])
-        G = np.eye(cov.shape[0]) + np.dot(np.dot(F.T, Jacobian), F)
-
-        # update predicted covariance
-        predict_cov = np.dot(np.dot(G, cov), G.T) + np.dot(np.dot(F.T, R), F)
-
-        # return
-        return predict_mean, predict_cov
-
-    def ekf_correction(self, predict_mean, predict_cov, z, Q):
-        # initialize mean and cov
-        mean = predict_mean.copy()
-        cov = predict_cov.copy()
-
-        # iterate each observed landmark
-        for obs in z:
-            # extract measurement data
-            id = int(obs[0])
-            measurement = obs[1:]
-            # if landmark not observed, initialize mean
-            if (self.observed_landmarks[id] == 0):
-                self.observed_landmarks[id] = 1
-                loc_x = mean[0] + measurement[0] * cos(mean[2] + measurement[1])
-                loc_y = mean[1] + measurement[0] * sin(mean[2] + measurement[1])
-                mean[2 + 2 * id + 1] = loc_x
-                mean[2 + 2 * id + 2] = loc_y
-            est_landmark = np.array([mean[2 + 2 * id + 1], mean[2 + 2 * id + 2]])
-            # get expected measurement (range-bearing)
-            delta = est_landmark - mean[0:2]
-            zi = self.range_bearing(id, mean[0:3], est_landmark)
-            zi = zi[1:]
-            q = zi[0] ** 2
-            q_sqrt = zi[0]
-            # generate matrix F
-            F = np.zeros((5, 3 + 2 * self.nLandmark))
-            F[0, 0] = 1
-            F[1, 1] = 1
-            F[2, 2] = 1
-            F[3, 2 + 2 * id + 1] = 1
-            F[4, 2 + 2 * id + 2] = 1
-            # calculate Jacobian matrix H of the measurement model
-            temp = np.array([
-                [-q_sqrt * delta[0], -q_sqrt * delta[1], 0, q_sqrt * delta[0], q_sqrt * delta[1]],
-                [delta[1], -delta[0], -q, -delta[1], delta[0]]
-            ])
-            H = (1 / zi[0] ** 2) * np.dot(temp, F)
-            # calculate Kalman gain: matrix K
-            mat1 = np.dot(cov, H.T)
-            mat2 = np.dot(np.dot(H, cov), H.T)
-            mat3 = np.linalg.inv(mat2 + Q)
-            K = np.dot(mat1, mat3)
-            # update mean and covariance matrix
-            diff_z = measurement - zi
-            diff_z[1] = normalize_angle(diff_z[1])
-            mean += np.dot(K, diff_z)
-            cov -= np.dot(np.dot(K, H), cov)
-
-        return mean, cov
-
-    def ekf_correction_mpc(self, predict_mean, predict_cov, z, Q):
-        # initialize mean and cov
-        mean = predict_mean.copy()
-        cov = predict_cov.copy()
-
-        # iterate each observed landmark
-        for obs in z:
-            # extract measurement data
-            id = int(obs[0])
-            measurement = obs[1:]
-            # est_landmark = self.landmarks[id]
-            est_landmark = np.array([
-                    mean[0] + measurement[0] * cos(measurement[1]+mean[2]),
-                    mean[1] + measurement[0] * sin(measurement[1]+mean[2])
-                ])
-            # assume perfect observation,
-            #   so expected measurement is same as the input
-            delta = est_landmark - mean[0:2]
-            zi = self.range_bearing(id, mean[0:3], est_landmark)
-            zi = zi[1:]
-            q = zi[0] ** 2
-            q_sqrt = zi[0]
-            # generate matrix F
-            F = np.zeros((5, 3 + 2 * self.nLandmark))
-            F[0, 0] = 1
-            F[1, 1] = 1
-            F[2, 2] = 1
-            F[3, 2 + 2 * id + 1] = 1
-            F[4, 2 + 2 * id + 2] = 1
-            # calculate Jacobian matrix H of the measurement model
-            temp = np.array([
-                [-q_sqrt * delta[0], -q_sqrt * delta[1], 0, q_sqrt * delta[0], q_sqrt * delta[1]],
-                [delta[1], -delta[0], -q, -delta[1], delta[0]]
-            ])
-            H = (1 / zi[0] ** 2) * np.dot(temp, F)
-            # calculate Kalman gain: matrix K
-            mat1 = np.dot(cov, H.T)
-            mat2 = np.dot(np.dot(H, cov), H.T)
-            mat3 = np.linalg.inv(mat2 + Q)
-            K = np.dot(mat1, mat3)
-            # update mean and covariance matrix
-            diff_z = measurement - zi
-            diff_z[1] = normalize_angle(diff_z[1])
-            mean += np.dot(K, diff_z)
-            cov -= np.dot(np.dot(K, H), cov)
-
-        return mean, cov
 
     def mpc_planning(self, mean, cov, ctrl, horizon, obsv_table):
         y_init = [np.concatenate((mean.reshape(-1), cov.reshape(-1), ctrl.reshape(-1)))]
@@ -450,35 +342,6 @@ class simulation_slam():
         # return
         return mean, cov
 
-    # old implementaton of ekf-ml prediction,
-    #   has discontinuity for observation
-    '''
-    def planning_prediction(self, mean, cov, ctrl, R, Q):
-        # ekf predict
-        predict_mean = mean.copy()
-        predict_cov = cov.copy()
-        predict_mean, predict_cov = self.ekf_slam_prediction(predict_mean, predict_cov, ctrl, R)
-
-        # predict observation using maximum likelihood
-        observations = []
-        agent_mean = predict_mean[0: self.nStates]
-        for id in range(self.nLandmark):
-            if self.observed_landmarks[id] == 1:
-                landmark_mean = predict_mean[2 + 2 * id + 1 : 2 + 2 * id + 2 + 1]
-                dist = sqrt((agent_mean[0] - landmark_mean[0])**2 + (agent_mean[1] - landmark_mean[1])**2)
-                if dist < self.sensor_range:
-                    predict_observation = self.range_bearing(id, agent_mean, landmark_mean)
-                    observations.append(predict_observation)
-            else: # landmark hasn't been observed yet
-                pass
-
-        # ekf correct
-        predict_mean, predict_cov = self.ekf_correction(predict_mean, predict_cov, observations, Q)
-
-        # return
-        return predict_mean, predict_cov
-    '''
-
     def generate_ellipse(self, x, y, theta, a, b):
         NPOINTS = 100
         # compose point vector
@@ -540,8 +403,9 @@ class simulation_slam():
         # xt_dr = np.stack(self.log['trajectory_dr'])
         # traj_dr = plt.scatter(xt_dr[:self.tf, 0], xt_dr[:self.tf, 1], s=point_size, c='cyan')
         xt_est = np.stack(self.log['trajectory_slam'])
-        print('xt_est: ', xt_est[:,0] - xt_true[:,0])
-        print('xt_est: ', xt_est[:,1] - xt_true[:,1])
+        xt_est = np.stack([item[0:2] for item in self.log['mean']])
+        print('xt_est: ', xt_est[:,0])# - xt_true[:,0])
+        print('xt_est: ', xt_est[:,1])# - xt_true[:,1])
         traj_est = plt.scatter(xt_est[:self.tf, 0], xt_est[:self.tf, 1], s=point_size, c='green')
 
         # plt.legend([traj_true, traj_dr, traj_est], ['True Path', 'Dead Reckoning Path', 'Estimated Path'])
@@ -564,6 +428,7 @@ class simulation_slam():
         fig = plt.gcf()
 
         xt_true = np.stack(self.log['trajectory_true'])
+        np.save('xt_true.npy', xt_true)
         points_true = ax.scatter([], [], s=point_size, color='red')
         agent_true = ax.scatter([], [], s=point_size * 100, color='red', marker='8')
 
@@ -573,6 +438,7 @@ class simulation_slam():
         mean_est = np.stack(self.log['trajectory_slam'])
         print('mean_est.shape: ', mean_est.shape)
         xt_est = mean_est
+        np.save('xt_est.npy', xt_est)
         points_est = ax.scatter([], [], s=point_size, color='green')
         agent_est = ax.scatter([], [], s=point_size * 100, color='green', marker='8')
 
