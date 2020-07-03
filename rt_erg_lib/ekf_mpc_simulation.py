@@ -37,7 +37,7 @@ class simulation_slam():
         self.observed_landmarks = np.zeros(self.landmarks.shape[0])
         self.curr_obsv = []
         # self.threshold = 99999999
-        self.threshold = 0.
+        self.threshold = 99999999.
 
         self.static_test = static_test
 
@@ -68,6 +68,7 @@ class simulation_slam():
         self.curr_t = 0
         for t in tqdm(range(self.tf)):
             self.curr_t = t
+            print('cov: ', cov)
             #########################
             # generate control and measurement data
             #########################
@@ -269,6 +270,8 @@ class simulation_slam():
             mat2 = np.dot(np.dot(H, cov), H.T)
             mat3 = np.linalg.inv(mat2 + Q)
             K = np.dot(mat1, mat3)
+            print('H: ', H)
+            print('K: ', K)
             # update mean and covariance matrix
             diff_z = measurement - zi
             diff_z[1] = normalize_angle(diff_z[1])
@@ -277,7 +280,7 @@ class simulation_slam():
 
         return mean, cov
 
-    def mpc_planning(self, mean, cov, ctrl, horizon=10):
+    def mpc_planning(self, mean, cov, ctrl, horizon=1):
         y_init = [np.concatenate((mean.reshape(-1), cov.reshape(-1), ctrl.reshape(-1)))]
         mean_init = mean.copy()
         cov_init = cov.copy()

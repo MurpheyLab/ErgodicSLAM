@@ -98,13 +98,19 @@ class simulation_slam():
                     if i in self.lm_id:
                         pass
                     else:
+                        print('new landmark found!')
                         self.lm_id.append(i)
                         lm = self.observe_landmark(mean[0:3], noisy_observation)
                         mean = np.concatenate((mean, lm))
+#                        cov = np.block([
+#                                [cov, np.zeros((cov.shape[0],2))],
+#                                [np.zeros((2,cov.shape[0])), np.zeros((2,2))]
+#                            ])
                         cov = np.block([
                                 [cov, np.zeros((cov.shape[0],2))],
-                                [np.zeros((2,cov.shape[0])), np.zeros((2,2))]
+                                [np.zeros((2,cov.shape[0])), np.eye(2)*99999999.]
                             ])
+                        print('cov: ', cov)
             observations = np.array(observations)
 
             self.log['true_landmarks'].append(true_landmarks)
@@ -143,29 +149,27 @@ class simulation_slam():
             #   ctrl and observations at (t)
             #########################
 
-            # process model for ekf prediction
-            '''
-            mean[2] = normalize_angle(mean[2])
-            g = np.zeros(mean.shape[0])
-            g[0] = cos(mean[2]) * ctrl[0]
-            g[1] = sin(mean[2]) * ctrl[0]
-            g[2] = ctrl[1]
-            mean += g * 0.1
-            '''
-            g = self.env_dr.f(mean[0:3], ctrl)
-            mean[0:3] = mean[0:3] + g * 0.1
-            print('mean(now): ', mean[0:3])
-            print('state(true): ', state_true)
-
-            G = np.zeros((mean.shape[0], mean.shape[0]))
-            G[0][2] = -sin(mean[2]) * ctrl[0]
-            G[1][2] =  cos(mean[2]) * ctrl[0]
+            G = np.eye(mean.shape[0])
+            G[0][2] = -sin(mean[2]) * ctrl[0] * 0.1
+            G[1][2] =  cos(mean[2]) * ctrl[0] * 0.1
             num_lm = len(self.lm_id)
             BigR = np.block([
                     [self.R, np.zeros((3, 2*num_lm))],
                     [np.zeros((2*num_lm, 3)), np.zeros((2*num_lm, 2*num_lm))]
                 ])
-            cov = G.T @ cov @ G + BigR
+            cov = G @ cov @ G.T + BigR
+            print('BigR: ', BigR)
+            print('cov(2): ', cov)
+
+            # process model for ekf prediction
+            g = np.zeros(mean.shape[0])
+            g[0] = cos(mean[2]) * ctrl[0]
+            g[1] = sin(mean[2]) * ctrl[0]
+            g[2] = ctrl[1]
+            mean += g * 0.1
+            mean[2] = normalize_angle(mean[2])
+            print('mean(now): ', mean[0:3])
+            print('state(true): ', state_true)
 
             # use observations for ekf correction
             num_obsv = len(self.curr_obsv)
@@ -194,9 +198,16 @@ class simulation_slam():
                 ref_observations.append(self.range_bearing(r, lm))
 
             ref_observations = np.array(ref_observations)
+            print('num_obsv: ', num_obsv)
             BigQ = block_diag(*[self.Q for _ in range(num_obsv)])
+            print('BigQ: ', BigQ)
 
-            K = cov @ H.T @ np.linalg.inv(H @ cov @ H.T + BigQ)
+            mat1 = np.dot(cov, H.T)
+            mat2 = np.dot(np.dot(H, cov), H.T)
+            mat3 = np.linalg.inv(mat2 + BigQ)
+            K = np.dot(mat1, mat3)
+
+            # K = np.dot(np.dot(cov, H.T), np.linalg.inv(H @ cov @ H.T + BigQ))
             delta_z = observations - ref_observations
             if len(delta_z) == 0:
                 pass
@@ -204,7 +215,12 @@ class simulation_slam():
                 delta_z[:,1] = normalize_angle(delta_z[:,1])
                 delta_z = delta_z.reshape(-1)
                 mean += K @ delta_z
-            cov = cov - K @ H @ cov
+                print('cov: ', cov)
+                cov = cov - K @ H @ cov
+                print('delta_z: ', delta_z)
+                print('H: ', H)
+                print('K: ', K)
+                print('K @ H @ cov: ', K @ H @ cov)
 
             print('mean(again): ', mean[0:3], end='\n\n')
             self.log['mean'].append(mean.copy())
@@ -514,6 +530,7 @@ class simulation_slam():
             for id in range(num_lm):
                 landmark_mean = self.log['mean'][i][2 + 2 * id + 1: 2 + 2 * id + 2 + 1]
                 landmark_cov = self.log['covariance'][i][2 + 2 * id + 1: 2 + 2 * id + 2 + 1, 2 + 2 * id + 1: 2 + 2 * id + 2 + 1]
+                # print('landmark_cov: ', landmark_cov)
                 p_landmark = self.generate_landmark_ellipse(landmark_mean, landmark_cov)
                 landmark_ellipses[id].set_offsets(np.array([p_landmark[0, :], p_landmark[1, :]]).T)
 
@@ -521,14 +538,16 @@ class simulation_slam():
             for point in sensor_points:
                 point[0].set_xdata([])
                 point[0].set_ydata([])
-            '''
+
             # observation model visualization
-            for obsv_id in range(len(self.log['observations'][i])):
-                observation = self.log['observations'][i][obsv_id]
+            id = 0
+            for obsv in self.log['observations'][i]:
+                observation = obsv
                 lm = self.observe_landmark(agent_mean, observation)
                 sensor_points[id][0].set_xdata([xt_true[i, 0], lm[0]])
-                sensor_points[id][0].set_ydata([xt_true[i, 1], lm[0]])
-            '''
+                sensor_points[id][0].set_ydata([xt_true[i, 1], lm[1]])
+                id += 1
+
             # return matplotlib objects for animation
             # ret = [points_true, points_dr, agent_ellipse, points_est]
             ret = [points_true, agent_ellipse, points_est, agent_true, agent_est, agent_plan_ellipse, agent_plan, points_plan]
