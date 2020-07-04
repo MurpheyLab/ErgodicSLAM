@@ -8,14 +8,14 @@ from rt_erg_lib.integrator_se2 import IntegratorSE2
 from rt_erg_lib.ergodic_control import RTErgodicControl
 from rt_erg_lib.target_dist import TargetDist
 from rt_erg_lib.utils import *
-from rt_erg_lib.ekf_mpc_simulation3 import simulation_slam
+from rt_erg_lib.ekf_mpc_simulation4 import simulation_slam
 import autograd.numpy as np
 
 """initialization"""
 size = 20.0
 # size = 25.0
 noise = 0.005
-init_state = np.array([11., 7., 0.0])
+init_state = np.array([11., 2., 0.0])
 envTrue = IntegratorSE2(size=size)
 modelTrue = IntegratorSE2(size=size)
 envDR = IntegratorSE2(size=size)
@@ -36,21 +36,21 @@ ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=horizon, num_basis=num_bas
 ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
 """start simulation"""
-tf = 20
+tf = 50
 # lanmark distribution 1: uniform
 landmarks1 = np.random.uniform(0.5, 7.5, size=(6, 2))
 landmarks2 = np.random.uniform(12.5, 19.5, size=(4, 2))
 landmarks = np.concatenate((landmarks1, landmarks2))
 
-landmarks = np.random.uniform(0.5, 19.5, size=(20, 2))
+landmarks = np.random.uniform(0.5, 19.5, size=(15, 2))
 # landmarks = np.array([[6., 14.]])
 
 sensor_range = 4
 motion_noise = np.array([0.04, 0.04, 0.01])
 measure_noise = np.array([0.01, 0.01])
-erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, static_test=15)
-erg_ctrl_sim.start(report=True, debug=False)
-# erg_ctrl_sim.animate(point_size=1, show_traj=False, plan=False, title='Landmarks Distribution')
+erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, static_test=45)
+erg_ctrl_sim.start(report=True, debug=True)
+# erg_ctrl_sim.animate(point_size=1, show_traj=True, plan=False, title='Landmarks Distribution')
 # erg_ctrl_sim.plot(point_size=1, save=None)
 # erg_ctrl_sim.path_reconstruct(save=None)
-# erg_ctrl_sim.static_test_plot(point_size=1, save=None)
+erg_ctrl_sim.static_test_plot(point_size=1, save=None)

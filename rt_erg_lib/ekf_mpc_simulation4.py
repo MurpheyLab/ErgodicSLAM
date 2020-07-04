@@ -116,27 +116,23 @@ class simulation_slam():
             ########################
             # Planning prediction
             ########################
+
+            obsv_lm = np.array([self.lm_id.index(item) for item in self.curr_obsv])
             '''
-            planning_predict_mean, planning_predict_cov = self.planning_prediction(mean, cov, ctrl, self.R, self.Q, self.curr_obsv)
+            planning_predict_mean, planning_predict_cov = self.planning_prediction(mean, cov, ctrl, obsv_lm)
             planning_predict_mean[2] = normalize_angle(planning_predict_mean[2])
-            self.log['planning_mean'].append(planning_predict_mean)
+            self.log['planning_mean'].append(planning_predict_mean[0:3])
             self.log['planning_cov'].append(planning_predict_cov)
-            print('mpc mean:\n', planning_predict_mean[0:3])
+            # print('mpc mean:\n', planning_predict_mean[0:3])
             '''
 
             #########################
             # MPC Planning Test
             #########################
+
             if self.static_test is not None:
                 if self.static_test == t:
-                    self.mpc_planning(mean, cov, np.array([0.7, 0.7]), horizon=10, obsv_table=self.curr_obsv, lm_id=np.array(self.lm_id))
-                else:
-                    pass
-            else:
-                if self.static_test == 'all':
-                    self.mpc_planning(mean, cov, np.array([0.7, 0.7]), horizon=20, obsv_table=self.curr_obsv, lm_id=np.array(self.lm_id))
-                else:
-                    pass
+                    self.mpc_planning(mean, cov, ctrl, horizon=10, obsv_lm=obsv_lm)
 
             #########################
             # EKF SLAM
@@ -234,203 +230,125 @@ class simulation_slam():
         return np.array([lm_x, lm_y])
 
 
-    def mpc_planning(self, mean, cov, ctrl, horizon, obsv_table, lm_id):
+    def mpc_planning(self, meann, covv, ctrl, horizon, obsv_lm):
+        init_ctrls = np.array([ctrl.copy() for _ in range(horizon)]).reshape(-1)
+        mean = meann.copy()
+        cov = covv.copy()
 
-        y_init = [np.concatenate((mean.reshape(-1), cov.reshape(-1), ctrl.reshape(-1)))]
-        mean_init = mean.copy()
-        cov_init = cov.copy()
-        for i in range(horizon):
-            mean_init, cov_init = self.planning_prediction(mean_init, cov_init, ctrl, self.R, self.Q, obsv_table, lm_id)
-            y_init.append(np.concatenate((mean_init.reshape(-1), cov_init.reshape(-1), ctrl.reshape(-1))))
-        y_init = np.array(y_init).reshape(-1)
+        objective = lambda ctrls : self.mpc_objective(mean, cov, ctrls.reshape(horizon,2), horizon, obsv_lm)
+        res = minimize(objective, init_ctrls, method='BFGS', tol=1e-06, options={'disp':True})
+        self.y_res = res.x.reshape(horizon, 2)
+        print(self.y_res)
 
-        dim = mean.shape[0]
-        cons = []
-        cons.append({'type':'eq', 'fun':lambda y:self.mpc_constraint(y, horizon, obsv_table, dim, lm_id)})
-        cons.append({'type':'eq', 'fun':lambda y:self.mpc_init_cond(y, y_init, horizon)})
-        objective = lambda y:self.mpc_objective(y, horizon, dim)
-        res = minimize(objective, y_init, method='SLSQP', constraints=cons, options={'disp':True})
-        y_res = res.x.reshape(horizon+1, -1)
-        np.save('static_mean_t{}.npy'.format(self.curr_t), mean)
-        np.save('static_cov_t{}.npy'.format(self.curr_t), cov)
-        np.save('static_y_res_t{}.npy'.format(self.curr_t), y_res)
-        self.y_res = y_res
-
-
+    def mpc_objective(self, meann, covv, ctrls, horizon, obsv_lm):
         '''
-        mean_0 = mean.copy()
-        mean_1 = mean.copy()
-        mean_2 = mean.copy()
-        mean_3 = mean.copy()
-        cov_0 = cov.copy()
-        cov_1 = cov.copy()
-        cov_2 = cov.copy()
-        cov_3 = cov.copy()
-        ctrl0 = np.zeros((horizon, 2))
-        ctrl1 = np.random.uniform(0, 1, size=(horizon, 2))
-        ctrl2 = np.random.uniform(0, 1, size=(horizon, 2))
-        ctrl3 = np.array([np.array([0.3, 0.1]) for _ in range(horizon)])
-        y_0 = [np.concatenate((mean_0.reshape(-1), cov_0.reshape(-1), ctrl0[0].reshape(-1)))]
-        y_1 = [np.concatenate((mean_1.reshape(-1), cov_1.reshape(-1), ctrl1[0].reshape(-1)))]
-        y_2 = [np.concatenate((mean_2.reshape(-1), cov_2.reshape(-1), ctrl2[0].reshape(-1)))]
-        y_3 = [np.concatenate((mean_3.reshape(-1), cov_3.reshape(-1), ctrl3[0].reshape(-1)))]
-        obj0 = 0.
-        obj1 = 0.
-        obj2 = 0.
-        obj3 = 0.
-        for i in range(horizon-1):
-            mean_0, cov_0 = self.planning_prediction(mean_0, cov_0, ctrl0[i+1], self.R, self.Q, obsv_table, lm_id)
-            mean_1, cov_1 = self.planning_prediction(mean_1, cov_1, ctrl1[i+1], self.R, self.Q, obsv_table, lm_id)
-            y_1.append(np.concatenate((mean_1.reshape(-1), cov_1.reshape(-1), ctrl1[i+1].reshape(-1))))
-            mean_2, cov_2 = self.planning_prediction(mean_2, cov_2, ctrl2[i+1], self.R, self.Q, obsv_table, lm_id)
-            y_2.append(np.concatenate((mean_2.reshape(-1), cov_2.reshape(-1), ctrl2[i+1].reshape(-1))))
-            mean_3, cov_3 = self.planning_prediction(mean_3, cov_3, ctrl3[i+1], self.R, self.Q, obsv_table, lm_id)
-            y_3.append(np.concatenate((mean_3.reshape(-1), cov_3.reshape(-1), ctrl3[i+1].reshape(-1))))
-        obj0 += np.trace(cov_0)
-        obj1 += np.trace(cov_1)
-        obj2 += np.trace(cov_2)
-        obj3 += np.trace(cov_3)
-        print('obj0: ', obj0)
-        print('obj1: ', obj1)
-        print('obj2: ', obj2)
-        print('obj3: ', obj3)
+        obsv_lm contains id for landmarks being observed in mean
         '''
+        mean = meann.copy()
+        cov = covv.copy()
+        obj = 0.
 
+        for t in range(horizon):
+            ctrl = ctrls[t]
+            ctrl_norm = np.linalg.norm(ctrl)
+            obj += 50 ** (ctrl_norm) - 1.
+            G = np.eye(mean.shape[0])
+            G[0][2] = -sin(mean[2]) * ctrl[0] * 0.1
+            G[1][2] =  cos(mean[2]) * ctrl[0] * 0.1
+            num_lm = int((mean.shape[0]-3) / 2)
+            BigR = np.block([
+                    [self.R, np.zeros((3, 2*num_lm))],
+                    [np.zeros((2*num_lm, 3)), np.zeros((2*num_lm,2*num_lm))]
+                ])
+            cov = G @ cov @ G.T + BigR
 
-    def mpc_init_cond(self, y, y_init, horizon):
-        new_y = y.reshape(horizon+1, -1)
-        new_x = new_y[0]
-        new_y_init = y_init.reshape(horizon+1, -1)
-        new_x_init = new_y_init[0]
-        return new_x - new_x_init
+            g = np.zeros(mean.shape[0])
+            g[0] = cos(mean[2]) * ctrl[0]
+            g[1] = sin(mean[2]) * ctrl[0]
+            g[2] = ctrl[1]
+            mean += g * 0.1
+            mean[2] = normalize_angle(mean[2])
 
-    def mpc_constraint(self, y, horizon, obsv_table, dim, lm_id):
-        cons = []
-        new_y = y.reshape(horizon+1, -1)
-        for i in range(horizon):
-            xt = new_y[i]
-            mean = xt[0:dim]
-            cov = xt[dim:-2].reshape(dim, dim)
-            ctrl = xt[-2:]
-            mean_tt, cov_tt = self.planning_prediction(mean, cov, ctrl, self.R, self.Q, obsv_table, lm_id)
-            xtt = np.concatenate((mean_tt.reshape(-1), cov_tt.reshape(-1), ctrl.reshape(-1)))
-            diff = new_y[i+1] - xtt
-            for item in diff:
-                cons.append(item)
-        return np.array(cons)
+            num_obsv = obsv_lm.shape[0]
+            H = np.zeros((num_obsv*2, mean.shape[0]))
+            r = mean[0:3].copy()
+            idx = -2
+            for lid in obsv_lm:
+                idx += 2
+                lm = mean[3+lid*2 : 5+lid*2]
+                zr = np.sqrt((r[0]-lm[0])**2 + (r[1]-lm[1])**2)
 
-    def mpc_objective(self, y, horizon, dim):
-        obj = 0
-        new_y = y.reshape(horizon+1, -1)
-        for state in new_y:
-            cov_flat = state[dim:-2]
-            cov = cov_flat.reshape(dim, dim)
-        obj += np.trace(cov)
-        return obj
+                H[idx][0]       = (r[0]-lm[0]) / zr
+                H[idx][1]       = (r[1]-lm[1]) / zr
+                H[idx][2]       = 0
+                H[idx][3+2*lid] = -(r[0]-lm[0]) / zr
+                H[idx][4+2*lid] = -(r[1]-lm[1]) / zr
 
-    def useless(self):
-        pass
+                H[idx+1][0]         = -(r[1]-lm[1]) / zr**2
+                H[idx+1][1]         =  (r[0]-lm[0]) / zr**2
+                H[idx+1][2]         = -1
+                H[idx+1][3+2*lid]   =  (r[1]-lm[1]) / zr**2
+                H[idx+1][4+2*lid]   = -(r[0]-lm[0]) / zr**2
+
+            BigQ = block_diag(*[self.Q for _ in range(num_obsv)])
+
+            K = cov @ H.T @ np.linalg.inv(H @ cov @ H.T + BigQ)
+            cov = cov - K @ H @ cov
+
+        return np.trace(cov) + obj * 0.000001
+
 
     # mpc-based implementaton of ekf-ml prediction,
     #   assume all landmarks observed at last time step
     #	can be observed in the horizon (ensure continuity)
-    def planning_prediction(self, input_mean, input_cov, ctrl, R, Q, obsv_table, lm_id):
-        # copy
-        mean = input_mean.copy()
-        cov = input_cov.copy()
+    def planning_prediction(self, meann, covv, ctrl, obsv_lm):
+        mean = meann.copy()
+        cov = covv.copy()
 
-        # predict observation
-        r = mean[0:3]
-        landmarks = mean[3:].reshape(-1, 2)
-        observations = []
-        lm_id = []
-        idx = -1
-        for lm in landmarks:
-            idx += 1
-            dist = np.sqrt((r[0]-lm[0])**2 + (r[1]-lm[1])**2)
-            if dist < self.sensor_range:
-                obsv = self.range_bearing(r, lm)
-                observations.append(obsv)
-                lm_id.append(idx)
-        observations = np.array(observations)
-        lm_id = np.array(lm_id)
+        for t in range(1):
+#            ctrl = ctrls[t]
+            G = np.eye(mean.shape[0])
+            G[0][2] = -sin(mean[2]) * ctrl[0] * 0.1
+            G[1][2] =  cos(mean[2]) * ctrl[0] * 0.1
+            num_lm = int((mean.shape[0]-3) / 2)
+            BigR = np.block([
+                    [self.R, np.zeros((3, 2*num_lm))],
+                    [np.zeros((2*num_lm, 3)), np.zeros((2*num_lm,2*num_lm))]
+                ])
+            cov = G @ cov @ G.T + BigR
 
-        # predict motion
-        nStates = 3
-        nLandmark = int((mean.shape[0] - 3)/2)
-        G = np.eye(mean.shape[0])
-        G[0][2] = -sin(mean[2]) * ctrl[0] * 0.1
-        G[1][2] =  cos(mean[2]) * ctrl[0] * 0.1
-        BigR = np.block([
-                [R, np.zeros((nStates, 2*nLandmark))],
-                [np.zeros((2*nLandmark, nStates)), np.zeros((2*nLandmark, 2*nLandmark))]
-            ])
-        cov = G @ cov @ G.T + BigR
+            g = np.zeros(mean.shape[0])
+            g[0] = cos(mean[2]) * ctrl[0]
+            g[1] = sin(mean[2]) * ctrl[0]
+            g[2] = ctrl[1]
+            mean += g * 0.1
+            mean[2] = normalize_angle(mean[2])
 
-        g = np.zeros(mean.shape[0])
-        g[0] = cos(mean[2]) * ctrl[0]
-        g[1] = sin(mean[2]) * ctrl[0]
-        mean += g * 0.1
+            num_obsv = obsv_lm.shape[0]
+            H = np.zeros((num_obsv*2, mean.shape[0]))
+            r = mean[0:3].copy()
+            idx = -2
+            for lid in obsv_lm:
+                idx += 2
+                lm = mean[3+lid*2 : 5+lid*2]
+                zr = np.sqrt((r[0]-lm[0])**2 + (r[1]-lm[1])**2)
 
-        # predict correction
-        r = mean[0:3]
-        num_obsv = len(lm_id)
-        H = np.zeros((2*num_obsv, mean.shape[0]))
-        idx = -2
-        for item in zip(lm_id, observations):
-            idx += 2
-            lid = item[0]
-            lm = landmarks[lid]
-            zr = np.sqrt((r[0]-lm[0])**2 + (r[1]-lm[1])**2)
+                H[idx][0]       = (r[0]-lm[0]) / zr
+                H[idx][1]       = (r[1]-lm[1]) / zr
+                H[idx][2]       = 0
+                H[idx][3+2*lid] = -(r[0]-lm[0]) / zr
+                H[idx][4+2*lid] = -(r[1]-lm[1]) / zr
 
-            H[idx][0]       = (r[0]-lm[0]) / zr
-            H[idx][1]       = (r[1]-lm[1]) / zr
-            H[idx][2]       = 0
-            H[idx][3+2*lid] = -(r[0]-lm[0]) / zr
-            H[idx][4+2*lid] = -(r[1]-lm[1]) / zr
+                H[idx+1][0]         = -(r[1]-lm[1]) / zr**2
+                H[idx+1][1]         =  (r[0]-lm[0]) / zr**2
+                H[idx+1][2]         = -1
+                H[idx+1][3+2*lid]   =  (r[1]-lm[1]) / zr**2
+                H[idx+1][4+2*lid]   = -(r[0]-lm[0]) / zr**2
 
-            H[idx+1][0]         = -(r[1]-lm[1]) / zr**2
-            H[idx+1][1]         =  (r[0]-lm[0]) / zr**2
-            H[idx+1][2]         = -1
-            H[idx+1][3+2*lid]   =  (r[1]-lm[1]) / zr**2
-            H[idx+1][4+2*lid]   = -(r[0]-lm[0]) / zr**2
+            BigQ = block_diag(*[self.Q for _ in range(num_obsv)])
 
-        BigQ = block_diag(*[Q for _ in range(num_obsv)])
-
-        K = cov @ H.T @ np.linalg.inv(H @ cov @ H.T + BigQ)
-
-        cov = cov - K @ H @ cov
-
-        '''
-        # correction
-        num_obsv = len(obsv_table)
-        H = np.zeros((2*num_obsv, mean.shape[0]))
-        r = mean[0:3]
-        i = -1
-        for oid in obsv_table:
-            i = i+1
-            idx = i*2
-            lid = np.where(lm_id==oid)[0][0]
-            lm = mean[3+lid*2:5+lid*2]
-            zr = np.sqrt((r[0]-lm[0])**2 + (r[1]-lm[1])**2)
-
-            H[idx][0]       = (r[0]-lm[0]) / zr
-            H[idx][1]       = (r[1]-lm[1]) / zr
-            H[idx][2]       = 0
-            H[idx][3+2*lid] = -(r[0]-lm[0]) / zr
-            H[idx][4+2*lid] = -(r[1]-lm[1]) / zr
-
-            H[idx+1][0]         = -(r[1]-lm[1]) / zr**2
-            H[idx+1][1]         =  (r[0]-lm[0]) / zr**2
-            H[idx+1][2]         = -1
-            H[idx+1][3+2*lid]   =  (r[1]-lm[1]) / zr**2
-            H[idx+1][4+2*lid]   = -(r[0]-lm[0]) / zr**2
-
-        BigQ = block_diag(*[self.Q for _ in range(num_obsv)])
-
-        K = cov @ H.T @ np.linalg.inv(H @ cov @ H.T + BigQ)
-        cov = cov - K @ H @ cov
-        '''
+            K = cov @ H.T @ np.linalg.inv(H @ cov @ H.T + BigQ)
+            cov = cov - K @ H @ cov
 
         # return
         return mean, cov
@@ -846,13 +764,25 @@ class simulation_slam():
 
         xt_true = np.stack(self.log['trajectory_true'])
         traj_true = plt.scatter(xt_true[:self.static_test, 0], xt_true[:self.static_test, 1], s=point_size, c='red')
-        xt_est = np.stack(self.log['mean'])
+        xt_est = np.stack(self.log['trajectory_slam'])
         traj_est = plt.scatter(xt_est[:self.static_test, 0], xt_est[:self.static_test, 1], s=point_size, c='green')
 
         plt.legend([traj_true, traj_est], ['True Path', 'Estimated Path'])
 
         # deal with self.y_res
-        mpc_xt = self.y_res[:, 0:2]
+        mpc_ut = self.y_res
+        mpc_xt = [xt_est[self.static_test].copy()]
+        idx = 0
+        for u in mpc_ut:
+            xt = mpc_xt[idx]
+            new_xt = xt.copy()
+            new_xt[0] += cos(xt[2]) * u[0] * 0.1
+            new_xt[1] += sin(xt[2]) * u[0] * 0.1
+            new_xt[2] += u[1] * 0.1
+            mpc_xt.append(new_xt.copy())
+            idx += 1
+        mpc_xt = np.array(mpc_xt)
+
         plt.scatter(mpc_xt[:,0], mpc_xt[:,1], s=point_size, c='yellow')
 
         # plot
