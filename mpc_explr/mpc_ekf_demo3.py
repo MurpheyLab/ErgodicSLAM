@@ -36,7 +36,7 @@ ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=horizon, num_basis=num_bas
 ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
 """start simulation"""
-tf = 300
+tf = 200
 # lanmark distribution 1: uniform
 landmarks1 = np.random.uniform(0.5, 7.5, size=(6, 2))
 landmarks2 = np.random.uniform(12.5, 19.5, size=(4, 2))
@@ -48,9 +48,9 @@ landmarks = np.random.uniform(0.5, 19.5, size=(20, 2))
 sensor_range = 4
 motion_noise = np.array([0.04, 0.04, 0.01])
 measure_noise = np.array([0.01, 0.01])
-erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, static_test=None)
+erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, static_test=195)
 erg_ctrl_sim.start(report=True, debug=False)
-erg_ctrl_sim.animate(point_size=1, show_traj=False, plan=False, title='Landmarks Distribution')
-erg_ctrl_sim.plot(point_size=1, save=None)
+# erg_ctrl_sim.animate(point_size=1, show_traj=False, plan=False, title='Landmarks Distribution')
+# erg_ctrl_sim.plot(point_size=1, save=None)
 # erg_ctrl_sim.path_reconstruct(save=None)
 # erg_ctrl_sim.static_test_plot(point_size=1, save=None)

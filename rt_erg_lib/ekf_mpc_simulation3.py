@@ -64,7 +64,6 @@ class simulation_slam():
 
         self.curr_t = 0
         for t in tqdm(range(self.tf)):
-            print('\nmean(before): ', mean[0:3])
             self.curr_t = t
             #########################
             # generate control and measurement data
@@ -98,7 +97,6 @@ class simulation_slam():
                     if i in self.lm_id:
                         pass
                     else:
-                        print('new landmark found!')
                         self.lm_id.append(i)
                         lm = self.observe_landmark(mean[0:3], noisy_observation)
                         mean = np.concatenate((mean, lm))
@@ -110,7 +108,6 @@ class simulation_slam():
                                 [cov, np.zeros((cov.shape[0],2))],
                                 [np.zeros((2,cov.shape[0])), np.eye(2)*99999999.]
                             ])
-                        print('cov: ', cov)
             observations = np.array(observations)
 
             self.log['true_landmarks'].append(true_landmarks)
@@ -130,18 +127,16 @@ class simulation_slam():
             #########################
             # MPC Planning Test
             #########################
-            '''
             if self.static_test is not None:
                 if self.static_test == t:
-                    self.mpc_planning(mean, cov, np.array([0.7, 0.7]), horizon=2, obsv_table=self.curr_obsv)
+                    self.mpc_planning(mean, cov, np.array([0.7, 0.7]), horizon=20, obsv_table=self.curr_obsv, lm_id=np.array(self.lm_id))
                 else:
                     pass
             else:
                 if self.static_test == 'all':
-                    self.mpc_planning(mean, cov, np.array([0.7, 0.7]), horizon=2, obsv_table=self.curr_obsv)
+                    self.mpc_planning(mean, cov, np.array([0.7, 0.7]), horizon=20, obsv_table=self.curr_obsv, lm_id=np.array(self.lm_id))
                 else:
                     pass
-            '''
 
             #########################
             # EKF SLAM
@@ -158,8 +153,6 @@ class simulation_slam():
                     [np.zeros((2*num_lm, 3)), np.zeros((2*num_lm, 2*num_lm))]
                 ])
             cov = G @ cov @ G.T + BigR
-            print('BigR: ', BigR)
-            print('cov(2): ', cov)
 
             # process model for ekf prediction
             g = np.zeros(mean.shape[0])
@@ -168,8 +161,6 @@ class simulation_slam():
             g[2] = ctrl[1]
             mean += g * 0.1
             mean[2] = normalize_angle(mean[2])
-            print('mean(now): ', mean[0:3])
-            print('state(true): ', state_true)
 
             # use observations for ekf correction
             num_obsv = len(self.curr_obsv)
@@ -198,9 +189,7 @@ class simulation_slam():
                 ref_observations.append(self.range_bearing(r, lm))
 
             ref_observations = np.array(ref_observations)
-            print('num_obsv: ', num_obsv)
             BigQ = block_diag(*[self.Q for _ in range(num_obsv)])
-            print('BigQ: ', BigQ)
 
             mat1 = np.dot(cov, H.T)
             mat2 = np.dot(np.dot(H, cov), H.T)
@@ -215,14 +204,8 @@ class simulation_slam():
                 delta_z[:,1] = normalize_angle(delta_z[:,1])
                 delta_z = delta_z.reshape(-1)
                 mean += K @ delta_z
-                print('cov: ', cov)
                 cov = cov - K @ H @ cov
-                print('delta_z: ', delta_z)
-                print('H: ', H)
-                print('K: ', K)
-                print('K @ H @ cov: ', K @ H @ cov)
 
-            print('mean(again): ', mean[0:3], end='\n\n')
             self.log['mean'].append(mean.copy())
             self.log['trajectory_slam'].append(mean[0:3].copy())
             self.log['covariance'].append(cov.copy())
@@ -251,25 +234,64 @@ class simulation_slam():
         return np.array([lm_x, lm_y])
 
 
-    def mpc_planning(self, mean, cov, ctrl, horizon, obsv_table):
+    def mpc_planning(self, mean, cov, ctrl, horizon, obsv_table, lm_id):
+        '''
         y_init = [np.concatenate((mean.reshape(-1), cov.reshape(-1), ctrl.reshape(-1)))]
         mean_init = mean.copy()
         cov_init = cov.copy()
         for i in range(horizon):
-            mean_init, cov_init = self.planning_prediction(mean_init, cov_init, ctrl, self.R, self.Q, obsv_table)
+            mean_init, cov_init = self.planning_prediction(mean_init, cov_init, ctrl, self.R, self.Q, obsv_table, lm_id)
             y_init.append(np.concatenate((mean_init.reshape(-1), cov_init.reshape(-1), ctrl.reshape(-1))))
         y_init = np.array(y_init).reshape(-1)
 
+        dim = mean.shape[0]
         cons = []
-        cons.append({'type':'eq', 'fun':lambda y:self.mpc_constraint(y, horizon, obsv_table)})
+        cons.append({'type':'eq', 'fun':lambda y:self.mpc_constraint(y, horizon, obsv_table, dim, lm_id)})
         cons.append({'type':'eq', 'fun':lambda y:self.mpc_init_cond(y, y_init, horizon)})
-        objective = lambda y:self.mpc_objective(y, horizon)
+        objective = lambda y:self.mpc_objective(y, horizon, dim)
         res = minimize(objective, y_init, method='SLSQP', constraints=cons, options={'disp':True})
         y_res = res.x.reshape(horizon+1, -1)
         np.save('static_mean_t{}.npy'.format(self.curr_t), mean)
         np.save('static_cov_t{}.npy'.format(self.curr_t), cov)
         np.save('static_y_res_t{}.npy'.format(self.curr_t), y_res)
         self.y_res = y_res
+        '''
+        mean_0 = mean.copy()
+        mean_1 = mean.copy()
+        mean_2 = mean.copy()
+        mean_3 = mean.copy()
+        cov_0 = cov.copy()
+        cov_1 = cov.copy()
+        cov_2 = cov.copy()
+        cov_3 = cov.copy()
+        ctrl0 = np.zeros((horizon, 2))
+        ctrl1 = np.random.uniform(0, 1, size=(horizon, 2))
+        ctrl2 = np.random.uniform(0, 1, size=(horizon, 2))
+        ctrl3 = np.array([np.array([0.3, 0.1]) for _ in range(horizon)])
+        y_0 = [np.concatenate((mean_0.reshape(-1), cov_0.reshape(-1), ctrl0[0].reshape(-1)))]
+        y_1 = [np.concatenate((mean_1.reshape(-1), cov_1.reshape(-1), ctrl1[0].reshape(-1)))]
+        y_2 = [np.concatenate((mean_2.reshape(-1), cov_2.reshape(-1), ctrl2[0].reshape(-1)))]
+        y_3 = [np.concatenate((mean_3.reshape(-1), cov_3.reshape(-1), ctrl3[0].reshape(-1)))]
+        obj0 = 0.
+        obj1 = 0.
+        obj2 = 0.
+        obj3 = 0.
+        for i in range(horizon-1):
+            mean_0, cov_0 = self.planning_prediction(mean_0, cov_0, ctrl0[i+1], self.R, self.Q, obsv_table, lm_id)
+            mean_1, cov_1 = self.planning_prediction(mean_1, cov_1, ctrl1[i+1], self.R, self.Q, obsv_table, lm_id)
+            y_1.append(np.concatenate((mean_1.reshape(-1), cov_1.reshape(-1), ctrl1[i+1].reshape(-1))))
+            mean_2, cov_2 = self.planning_prediction(mean_2, cov_2, ctrl2[i+1], self.R, self.Q, obsv_table, lm_id)
+            y_2.append(np.concatenate((mean_2.reshape(-1), cov_2.reshape(-1), ctrl2[i+1].reshape(-1))))
+            mean_3, cov_3 = self.planning_prediction(mean_3, cov_3, ctrl3[i+1], self.R, self.Q, obsv_table, lm_id)
+            y_3.append(np.concatenate((mean_3.reshape(-1), cov_3.reshape(-1), ctrl3[i+1].reshape(-1))))
+        obj0 += np.trace(cov_0)
+        obj1 += np.trace(cov_1)
+        obj2 += np.trace(cov_2)
+        obj3 += np.trace(cov_3)
+        print('obj0: ', obj0)
+        print('obj1: ', obj1)
+        print('obj2: ', obj2)
+        print('obj3: ', obj3)
 
     def mpc_init_cond(self, y, y_init, horizon):
         new_y = y.reshape(horizon+1, -1)
@@ -278,27 +300,27 @@ class simulation_slam():
         new_x_init = new_y_init[0]
         return new_x - new_x_init
 
-    def mpc_constraint(self, y, horizon, obsv_table):
+    def mpc_constraint(self, y, horizon, obsv_table, dim, lm_id):
         cons = []
         new_y = y.reshape(horizon+1, -1)
         for i in range(horizon):
             xt = new_y[i]
-            mean = xt[0:self.dim]
-            cov = xt[self.dim:-2].reshape(self.dim, self.dim)
+            mean = xt[0:dim]
+            cov = xt[dim:-2].reshape(dim, dim)
             ctrl = xt[-2:]
-            mean_tt, cov_tt = self.planning_prediction(mean, cov, ctrl, self.R, self.Q, obsv_table)
+            mean_tt, cov_tt = self.planning_prediction(mean, cov, ctrl, self.R, self.Q, obsv_table, lm_id)
             xtt = np.concatenate((mean_tt.reshape(-1), cov_tt.reshape(-1), ctrl.reshape(-1)))
             diff = new_y[i+1] - xtt
             for item in diff:
                 cons.append(item)
         return np.array(cons)
 
-    def mpc_objective(self, y, horizon):
+    def mpc_objective(self, y, horizon, dim):
         obj = 0
         new_y = y.reshape(horizon+1, -1)
         for state in new_y:
-            cov_flat = state[self.dim:-2]
-            cov = cov_flat.reshape(self.dim, self.dim)
+            cov_flat = state[dim:-2]
+            cov = cov_flat.reshape(dim, dim)
         obj += np.trace(cov)
         return obj
 
@@ -308,33 +330,37 @@ class simulation_slam():
     # mpc-based implementaton of ekf-ml prediction,
     #   assume all landmarks observed at last time step
     #	can be observed in the horizon (ensure continuity)
-    def planning_prediction(self, input_mean, input_cov, ctrl, R, Q, obsv_table):
+    def planning_prediction(self, input_mean, input_cov, ctrl, R, Q, obsv_table, lm_id):
         # copy
         mean = input_mean.copy()
         cov = input_cov.copy()
 
         # predict
-        G = np.zeros((self.dim, self.dim))
-        G[0][2] = -sin(mean[2]) * ctrl[0]
-        G[1][2] =  cos(mean[2]) * ctrl[0]
+        nStates = 3
+        nLandmark = int((mean.shape[0] - 3)/2)
+        G = np.eye(mean.shape[0])
+        G[0][2] = -sin(mean[2]) * ctrl[0] * 0.1
+        G[1][2] =  cos(mean[2]) * ctrl[0] * 0.1
         BigR = np.block([
-                [R, np.zeros((self.nStates, 2*self.nLandmark))],
-                [np.zeros((2*self.nLandmark, self.nStates)), np.zeros((2*self.nLandmark, 2*self.nLandmark))]
+                [R, np.zeros((nStates, 2*nLandmark))],
+                [np.zeros((2*nLandmark, nStates)), np.zeros((2*nLandmark, 2*nLandmark))]
             ])
-        cov = G.T @ cov @ G + BigR
+        cov = G @ cov @ G.T + BigR
 
-        g = np.zeros(self.dim)
+        g = np.zeros(mean.shape[0])
         g[0] = cos(mean[2]) * ctrl[0]
         g[1] = sin(mean[2]) * ctrl[0]
         mean += g * 0.1
 
         # correction
         num_obsv = len(obsv_table)
-        H = np.zeros((2*num_obsv, self.dim))
+        H = np.zeros((2*num_obsv, mean.shape[0]))
         r = mean[0:3]
-        for i in range(num_obsv):
+        i = -1
+        for oid in obsv_table:
+            i = i+1
             idx = i*2
-            lid = obsv_table[i]
+            lid = np.where(lm_id==oid)[0][0]
             lm = mean[3+lid*2:5+lid*2]
             zr = np.sqrt((r[0]-lm[0])**2 + (r[1]-lm[1])**2)
 
@@ -420,8 +446,6 @@ class simulation_slam():
         # traj_dr = plt.scatter(xt_dr[:self.tf, 0], xt_dr[:self.tf, 1], s=point_size, c='cyan')
         xt_est = np.stack(self.log['trajectory_slam'])
         xt_est = np.stack([item[0:2] for item in self.log['mean']])
-        print('xt_est: ', xt_est[:,0])# - xt_true[:,0])
-        print('xt_est: ', xt_est[:,1])# - xt_true[:,1])
         traj_est = plt.scatter(xt_est[:self.tf, 0], xt_est[:self.tf, 1], s=point_size, c='green')
 
         # plt.legend([traj_true, traj_dr, traj_est], ['True Path', 'Dead Reckoning Path', 'Estimated Path'])
