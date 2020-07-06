@@ -13,7 +13,7 @@ from scipy.linalg import block_diag
 
 class simulation_slam():
     def __init__(self, size, init_state, t_dist, model_true, erg_ctrl_true, env_true, model_dr, erg_ctrl_dr, env_dr, tf,
-                 landmarks, sensor_range, motion_noise, measure_noise, static_test=None):
+                 landmarks, sensor_range, motion_noise, measure_noise, static_test, horizon, switch):
         self.size = size
         self.init_state = init_state
         self.tf = tf
@@ -40,7 +40,10 @@ class simulation_slam():
         self.threshold = 0.
 
         self.lm_id = []
+        self.obsv_lm = []
         self.static_test = static_test
+        self.horizon = horizon
+        self.switch = switch
 
     def start(self, report=False, debug=False):
         #########################
@@ -54,11 +57,13 @@ class simulation_slam():
         cov = np.zeros((self.nStates, self.nStates))
         mean[0:3] = self.init_state
 
+        obsv_lm = []
+
         ##########################
         # simulation loop
         ##########################
         self.log = {'trajectory_true': [], 'trajectory_dr': [], 'true_landmarks': [], 'observations': [], 'mean': [], 'trajectory_slam': [],
-                    'covariance': [], 'planning_mean': [], 'planning_cov': []}
+                'covariance': [], 'planning_mean': [], 'planning_cov': [], 'mpc_ctrls': []}
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
@@ -69,10 +74,13 @@ class simulation_slam():
             # generate control and measurement data
             #########################
             # this is what robot thinks it's doing
-            if debug:  # debug mode: robot runs a circle
-                ctrl = np.array([2.2, 0.4])
+            if t < self.switch: # default control
+                ctrl = np.array([2.8, 0.4])
             else:
-                ctrl = self.erg_ctrl_dr(mean[0:self.nStates])
+                obsv_lm = np.array([self.lm_id.index(item) for item in self.curr_obsv])
+                mpc_ctrls = self.mpc_planning(mean, cov, [2.8,0.4], horizon=self.horizon, obsv_lm=obsv_lm)
+                ctrl = mpc_ctrls[0]
+                self.log['mpc_ctrls'].append(mpc_ctrls)
             state_dr = self.env_dr.step(ctrl)
             self.log['trajectory_dr'].append(state_dr)
 
@@ -116,9 +124,8 @@ class simulation_slam():
             ########################
             # Planning prediction
             ########################
-
-            obsv_lm = np.array([self.lm_id.index(item) for item in self.curr_obsv])
             '''
+            obsv_lm = np.array([self.lm_id.index(item) for item in self.curr_obsv])
             planning_predict_mean, planning_predict_cov = self.planning_prediction(mean, cov, ctrl, obsv_lm)
             planning_predict_mean[2] = normalize_angle(planning_predict_mean[2])
             self.log['planning_mean'].append(planning_predict_mean[0:3])
@@ -129,10 +136,11 @@ class simulation_slam():
             #########################
             # MPC Planning Test
             #########################
-
+            '''
             if self.static_test is not None:
                 if self.static_test == t:
-                    self.mpc_planning(mean, cov, ctrl, horizon=10, obsv_lm=obsv_lm)
+                    self.mpc_planning(mean, cov, ctrl, horizon=20, obsv_lm=obsv_lm)
+            '''
 
             #########################
             # EKF SLAM
@@ -229,16 +237,17 @@ class simulation_slam():
         lm_y = agent[1] + obsv[0] * sin(agent[2] + obsv[1])
         return np.array([lm_x, lm_y])
 
-
     def mpc_planning(self, meann, covv, ctrl, horizon, obsv_lm):
         init_ctrls = np.array([ctrl.copy() for _ in range(horizon)]).reshape(-1)
         mean = meann.copy()
         cov = covv.copy()
 
-        objective = lambda ctrls : self.mpc_objective(mean, cov, ctrls.reshape(horizon,2), horizon, obsv_lm)
-        res = minimize(objective, init_ctrls, method='BFGS', tol=1e-06, options={'disp':True})
-        self.y_res = res.x.reshape(horizon, 2)
-        print(self.y_res)
+        objective = lambda ctrls : self.mpc_objective(mean, cov, ctrls, horizon, obsv_lm)
+        bounds = [[-2., 2.] for _ in range(horizon*2)]
+        res = minimize(objective, x0=init_ctrls, method='trust-constr', bounds=bounds, options={'disp':True,})# 'gtol':1e-12, 'xtol':1e-12})
+        res = minimize(objective, init_ctrls, method='BFGS', tol=1e-10, options={'disp':True})
+        controls = res.x.reshape(horizon, 2)
+        return controls
 
     def mpc_objective(self, meann, covv, ctrls, horizon, obsv_lm):
         '''
@@ -249,9 +258,9 @@ class simulation_slam():
         obj = 0.
 
         for t in range(horizon):
-            ctrl = ctrls[t]
+            ctrl = ctrls[2*t:2*t+2]
+            obj += 50. ** np.linalg.norm(ctrl) - 1.
             ctrl_norm = np.linalg.norm(ctrl)
-            obj += 50 ** (ctrl_norm) - 1.
             G = np.eye(mean.shape[0])
             G[0][2] = -sin(mean[2]) * ctrl[0] * 0.1
             G[1][2] =  cos(mean[2]) * ctrl[0] * 0.1
@@ -295,8 +304,29 @@ class simulation_slam():
             K = cov @ H.T @ np.linalg.inv(H @ cov @ H.T + BigQ)
             cov = cov - K @ H @ cov
 
-        return np.trace(cov) + obj * 0.000001
+        # print('cov: ', np.exp( np.log( (np.linalg.det(cov))**(1/mean.shape[0]) ) ) )# + obj * 0.00000001 )
+        # print('obj: ', obj * 0.000001)
 
+        # A-optimality
+        return np.trace(cov) #+ obj * 0.00000001
+
+        # test D-optimality: 0
+        # return np.linalg.det(cov) + obj * 0.00000001
+
+        # test D-optimality: 1
+        # return np.exp( np.log( (np.linalg.det(cov))**(1/mean.shape[0]) ) ) + obj * 0.00000001
+
+        # test D-optimality: 2
+        '''
+        obj = np.linalg.det(cov[0:3, 0:3])
+        num_lm = int((mean.shape[0]-3) / 2)
+        for i in range(num_lm):
+            obj += np.linalg.det(cov[3+i*2:5+i*2, 3+i*2:5+i*2])
+        return obj
+        '''
+
+        # test E-optimality
+        # return 0.5 * np.log(2*np.pi*np.e)**mean.shape[0] * np.linalg.norm(cov)
 
     # mpc-based implementaton of ekf-ml prediction,
     #   assume all landmarks observed at last time step
@@ -428,13 +458,14 @@ class simulation_slam():
         # return plt.gcf()
 
     def animate(self, point_size=1, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
-        [xy, vals] = self.t_dist.get_grid_spec()
-        plt.contourf(*xy, vals, levels=20)
-        plt.scatter(self.landmarks[:, 0], self.landmarks[:, 1], color='black', marker='P')
-        ax = plt.gca()
-        ax.set_aspect('equal', 'box')
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.set_aspect('equal')
+        ax.set_xlim(0, self.size)
+        ax.set_ylim(0, self.size)
         ax.set_title(title)
-        fig = plt.gcf()
+
+        ax.scatter(self.landmarks[:,0], self.landmarks[:,1], color='black', marker='P')
 
         xt_true = np.stack(self.log['trajectory_true'])
         np.save('xt_true.npy', xt_true)
@@ -461,7 +492,7 @@ class simulation_slam():
         landmark_ellipses = []
         for id in range(self.landmarks.shape[0]):
             observation_lines.append(ax.plot([], [], color='orange'))
-            landmark_ellipses.append(ax.scatter([], [], s=point_size, c='white'))
+            landmark_ellipses.append(ax.scatter([], [], s=point_size, c='blue'))
 
         agent_ellipse = ax.scatter([], [], s=point_size, c='green')
         agent_plan_ellipse = ax.scatter([], [], s=point_size, c='yellow')
@@ -473,6 +504,8 @@ class simulation_slam():
         for id in range(self.landmarks.shape[0]):
             sensor_point = ax.plot([], [], color='orange')
             sensor_points.append(sensor_point)
+
+        sim_traj = ax.scatter([], [], s=point_size, c='purple')
 
         def sub_animate(i):
             # for debug: save frame
@@ -541,9 +574,24 @@ class simulation_slam():
                 sensor_points[id][0].set_ydata([xt_true[i, 1], lm[1]])
                 id += 1
 
+            if i < self.switch:
+                sim_traj.set_offsets([-1., -1.])
+            else:
+                mpc_ctrls = self.log['mpc_ctrls'][i-self.switch]
+                mpc_traj = [xt_est[i][0:3]]
+                for k in range(self.horizon):
+                    ctrl = mpc_ctrls[k]
+                    state = mpc_traj[k].copy()
+                    state[0] += cos(state[2]) * ctrl[0] * 0.1
+                    state[1] += sin(state[2]) * ctrl[0] * 0.1
+                    state[2] += ctrl[1] * 0.1
+                    mpc_traj.append(state)
+                mpc_traj = np.array(mpc_traj)
+                sim_traj.set_offsets(mpc_traj[:, 0:2])
+
             # return matplotlib objects for animation
             # ret = [points_true, points_dr, agent_ellipse, points_est]
-            ret = [points_true, agent_ellipse, points_est, agent_true, agent_est, agent_plan_ellipse, agent_plan, points_plan]
+            ret = [sim_traj, points_true, agent_ellipse, points_est, agent_true, agent_est, agent_plan_ellipse, agent_plan, points_plan]
             for item in sensor_points:
                 ret.append(item[0])
             for item in landmark_ellipses:

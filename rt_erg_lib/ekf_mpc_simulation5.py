@@ -13,7 +13,7 @@ from scipy.linalg import block_diag
 
 class simulation_slam():
     def __init__(self, size, init_state, t_dist, model_true, erg_ctrl_true, env_true, model_dr, erg_ctrl_dr, env_dr, tf,
-                 landmarks, sensor_range, motion_noise, measure_noise, static_test, horizon):
+                 landmarks, sensor_range, motion_noise, measure_noise, static_test, horizon, switch):
         self.size = size
         self.init_state = init_state
         self.tf = tf
@@ -42,6 +42,7 @@ class simulation_slam():
         self.lm_id = []
         self.static_test = static_test
         self.horizon = horizon
+        self.switch = switch
 
     def start(self, report=False, debug=False):
         #########################
@@ -70,7 +71,7 @@ class simulation_slam():
             # generate control and measurement data
             #########################
             # this is what robot thinks it's doing
-            if t < 100:  # debug mode: robot runs a circle
+            if t < self.switch:  # debug mode: robot runs a circle
                 ctrl = np.array([2.5, 0.4])
             else:
                 mpc_ctrls = self.mpc_planning(mean, cov, ctrl, horizon=self.horizon)
@@ -325,8 +326,14 @@ class simulation_slam():
             K = cov @ H.T @ np.linalg.inv(H @ cov @ H.T + BigQ)
             cov = cov - K @ H @ cov
 
-        return np.trace(cov) # + obj * 0.0000001
+        # test A-optimality
+        # return np.trace(cov)
 
+        # test D-optimality: 0
+        # return np.linalg.det(cov)
+
+        # test D-optimality: 1
+        return np.exp(np.log(np.linalg.det(cov) ** (1./cov.shape[0])))
 
     # mpc-based implementaton of ekf-ml prediction,
     #   assume all landmarks observed at last time step
@@ -574,10 +581,10 @@ class simulation_slam():
                 sensor_points[id][0].set_ydata([xt_true[i, 1], lm[1]])
                 id += 1
 
-            if i<100:
+            if i<self.switch:
                 sim_traj.set_offsets([-1., -1.])
             else:
-                mpc_ctrls = self.log['mpc_ctrls'][i-100]
+                mpc_ctrls = self.log['mpc_ctrls'][i-self.switch]
                 mpc_traj = [xt_est[i][0:3]]
                 for k in range(self.horizon):
                     ctrl = mpc_ctrls[k]
