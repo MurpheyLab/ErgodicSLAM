@@ -78,7 +78,7 @@ class simulation_slam():
                 ctrl = np.array([2.8, 0.4])
             else:
                 obsv_lm = np.array([self.lm_id.index(item) for item in self.curr_obsv])
-                mpc_ctrls = self.mpc_planning(mean, cov, [2.8,0.4], horizon=self.horizon, obsv_lm=obsv_lm)
+                mpc_ctrls = self.mpc_planning(mean, cov, ctrl, horizon=self.horizon, obsv_lm=obsv_lm)
                 ctrl = mpc_ctrls[0]
                 self.log['mpc_ctrls'].append(mpc_ctrls)
             state_dr = self.env_dr.step(ctrl)
@@ -245,7 +245,7 @@ class simulation_slam():
         objective = lambda ctrls : self.mpc_objective(mean, cov, ctrls, horizon, obsv_lm)
         bounds = [[-2., 2.] for _ in range(horizon*2)]
         res = minimize(objective, x0=init_ctrls, method='trust-constr', bounds=bounds, options={'disp':True,})# 'gtol':1e-12, 'xtol':1e-12})
-        res = minimize(objective, init_ctrls, method='BFGS', tol=1e-10, options={'disp':True})
+        # res = minimize(objective, init_ctrls, method='BFGS', tol=1e-10, options={'disp':True})
         controls = res.x.reshape(horizon, 2)
         return controls
 
@@ -259,7 +259,7 @@ class simulation_slam():
 
         for t in range(horizon):
             ctrl = ctrls[2*t:2*t+2]
-            obj += 50. ** np.linalg.norm(ctrl) - 1.
+            # obj += 50. ** np.linalg.norm(ctrl) - 1.
             ctrl_norm = np.linalg.norm(ctrl)
             G = np.eye(mean.shape[0])
             G[0][2] = -sin(mean[2]) * ctrl[0] * 0.1

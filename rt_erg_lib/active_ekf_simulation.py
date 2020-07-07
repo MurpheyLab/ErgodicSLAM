@@ -14,7 +14,7 @@ from time import time
 
 class simulation_slam():
     def __init__(self, size, init_state, t_dist, model_true, erg_ctrl_true, env_true, model_dr, erg_ctrl_dr, env_dr, tf,
-                 landmarks, sensor_range, motion_noise, measure_noise):
+                 landmarks, sensor_range, motion_noise, measure_noise, switch):
         self.size = size
         self.init_state = init_state
         self.tf = tf
@@ -42,6 +42,8 @@ class simulation_slam():
         self.threshold = 99999999
 
         self.init_phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.t_dist.target_grid_vals, self.t_dist.grid)
+
+        self.switch = switch
 
     def start(self, report=False, debug=False, update=1, update_threshold=1e-3, snapshot=0):
         #########################
@@ -73,8 +75,8 @@ class simulation_slam():
             # generate control and measurement data
             #########################
             # this is what robot thinks it's doing
-            if debug:  # debug mode: robot runs a circle
-                ctrl = np.array([2.0, 0.5])
+            if t<self.switch:  # debug mode: robot runs a circle
+                ctrl = np.array([2.5, 0.4])
             else:
                 ctrl = self.erg_ctrl_dr(mean[0:self.nStates])
             state_dr = self.env_dr.step(ctrl)
@@ -410,11 +412,14 @@ class simulation_slam():
     def animate(self, point_size=1, alpha=1, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
         # [xy, vals] = self.init_t_dist.get_grid_spec()
         # plt.contourf(*xy, vals, levels=20)
-        plt.scatter(self.landmarks[:, 0], self.landmarks[:, 1], color='white', marker='P')
-        ax = plt.gca()
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
         ax.set_aspect('equal', 'box')
+        ax.set_xlim(0, self.size)
+        ax.set_ylim(0, self.size)
         ax.set_title(title)
-        fig = plt.gcf()
+
+        ax.scatter(self.landmarks[:, 0], self.landmarks[:, 1], color='black', marker='P')
 
         xt_true = np.stack(self.log['trajectory_true'])
         points_true = ax.scatter([], [], s=point_size, color='red')

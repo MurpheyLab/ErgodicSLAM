@@ -106,12 +106,13 @@ class RTErgodicControl(object):
 
             self.u_seq[t] = -np.dot(np.dot(self.Rinv, fdu[t].T), rho)
 
-            if (np.abs(self.u_seq[t]) > 1.0).any():
-                self.u_seq[t] /= np.linalg.norm(self.u_seq[t])
+            # if (np.abs(self.u_seq[t]) > 1.0).any():
+            if (np.abs(self.u_seq[t]) > 2.0).any():
+                self.u_seq[t] /= np.linalg.norm(self.u_seq[t]) / 2.0
 
         self.replay_buffer.push(state[self.model.explr_idx])
 
         if get_useq is True:
-            return self.u_seq[0].copy(), self.u_seq
+            return self.u_seq[0].copy(), self.u_seq.copy()
         else:
-            return self.u_seq[0]
+            return self.u_seq[0].copy()

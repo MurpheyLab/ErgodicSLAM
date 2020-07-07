@@ -6,15 +6,15 @@ import sys
 sys.path.append("/home/msun/Code/ErgodicBSP")
 from rt_erg_lib.integrator_se2 import IntegratorSE2
 from rt_erg_lib.ergodic_control import RTErgodicControl
-from rt_erg_lib.active_target_dist import TargetDist
+from rt_erg_lib.active_target_dist2 import TargetDist
 from rt_erg_lib.utils import *
-from rt_erg_lib.active_ekf_simulation import simulation_slam
+from rt_erg_lib.active_ekf_simulation2 import simulation_slam
 import autograd.numpy as np
 from math import sin, cos
 from math import pi
 
 """initialization"""
-tf = 400
+tf = 200
 size = 20.0
 # size = 25.0
 noise = 0.005
@@ -30,9 +30,11 @@ means = [np.array([14.5, 5.5]), np.array([6.5, 15.5])]
 vars = [np.array([1.2, 1.2])**2, np.array([1.2, 1.2])**2]
 t_dist = TargetDist(num_pts=50, means=means, vars=vars, size=size)
 
-ergCtrlTrue = RTErgodicControl(modelTrue, t_dist, horizon=20, num_basis=15, batch_size=200)
+erg_horizon = 20
+
+ergCtrlTrue = RTErgodicControl(modelTrue, t_dist, horizon=erg_horizon, num_basis=15, batch_size=200)
 ergCtrlTrue.phik = convert_phi2phik(ergCtrlTrue.basis, t_dist.grid_vals, t_dist.grid)
-ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=20, num_basis=15, batch_size=200)
+ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=erg_horizon, num_basis=15, batch_size=200)
 ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 ergCtrlDR.init_phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
@@ -73,7 +75,7 @@ erg_ctrl_sim.start(report=True, debug=False, update=3)
 
 # erg_ctrl_sim.animate_eval(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
 # erg_ctrl_sim.animate2(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
-erg_ctrl_sim.animate(point_size=2, alpha=4, show_traj=True, title='Landmarks Distribution Test', rate=50)
+erg_ctrl_sim.animate(point_size=1, show_traj=True, plan=False, title='Landmarks Distribution')
 
 # erg_ctrl_sim.plot(point_size=1, save=None)
 # erg_ctrl_sim.path_reconstruct(save=None)
