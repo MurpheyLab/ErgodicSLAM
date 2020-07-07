@@ -308,7 +308,7 @@ class simulation_slam():
         # print('obj: ', obj * 0.000001)
 
         # A-optimality
-        return np.trace(cov) #+ obj * 0.00000001
+        # return np.trace(cov) #+ obj * 0.00000001
 
         # test D-optimality: 0
         # return np.linalg.det(cov) + obj * 0.00000001
@@ -326,7 +326,7 @@ class simulation_slam():
         '''
 
         # test E-optimality
-        # return 0.5 * np.log(2*np.pi*np.e)**mean.shape[0] * np.linalg.norm(cov)
+        return 0.5 * np.log(2*np.pi*np.e)**mean.shape[0] * np.linalg.norm(cov)
 
     # mpc-based implementaton of ekf-ml prediction,
     #   assume all landmarks observed at last time step

@@ -336,9 +336,12 @@ class simulation_slam():
         # return np.exp(np.log(np.linalg.det(cov) ** (1./cov.shape[0])))
 
         # test D-optimality: 2
-        obj = np.linalg.det(cov) ** (1./cov.shape[0])
-        print('obj: ', obj)
-        return obj
+        # obj = np.linalg.det(cov) ** (1./cov.shape[0])
+        # print('obj: ', obj)
+        # return obj
+
+        # test D-optimality: 3
+        return -np.log( np.linalg.det(cov) )
 
         # test E-optimality
         # return 0.5 * np.log(2*pi*e)**cov.shape[0] * np.linalg.norm(cov)

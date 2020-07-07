@@ -37,7 +37,7 @@ ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=horizon, num_basis=num_bas
 ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
 """start simulation"""
-tf = 150
+tf = 200
 # lanmark distribution 1: uniform
 landmarks1 = np.random.uniform(0.5, 7.5, size=(6, 2))
 landmarks2 = np.random.uniform(12.5, 19.5, size=(4, 2))
