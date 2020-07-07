@@ -327,7 +327,7 @@ class simulation_slam():
             cov = cov - K @ H @ cov
 
         # test A-optimality
-        # return np.trace(cov)
+        return np.trace(cov)
 
         # test D-optimality: 0
         # return np.linalg.det(cov)
@@ -341,7 +341,7 @@ class simulation_slam():
         # return obj
 
         # test D-optimality: 3
-        return -np.log( np.linalg.det(cov) )
+        # return -np.log( np.linalg.det(cov) )
 
         # test E-optimality
         # return 0.5 * np.log(2*pi*e)**cov.shape[0] * np.linalg.norm(cov)
