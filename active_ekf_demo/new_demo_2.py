@@ -14,8 +14,8 @@ from math import sin, cos
 from math import pi
 
 """initialization"""
-tf = 2000
-size = 40.0
+tf = 1500
+size = 20.0
 # size = 25.0
 noise = 0.005
 init_state = np.array([11., 2., 0.0])
@@ -66,12 +66,12 @@ landmarks = np.concatenate((landmarks1, landmarks2))
 
 # np.save("landmarks_temp.npy", landmarks)
 
-landmarks = np.random.uniform(0.5, size-0.5, size=(30,2))
+landmarks = np.random.uniform(0.5, size-0.5, size=(10,2))
 
-sensor_range = 4
+sensor_range = 3
 motion_noise = np.array([0.04, 0.04, 0.01])
 measure_noise = np.array([0.01, 0.01])
-erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, switch=100)
+erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, switch=1)
 erg_ctrl_sim.start(report=True, debug=False, update=3)
 
 # erg_ctrl_sim.animate_eval(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
