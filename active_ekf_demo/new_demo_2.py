@@ -14,7 +14,7 @@ from math import sin, cos
 from math import pi
 
 """initialization"""
-tf = 1500
+tf = 1000
 size = 20.0
 # size = 25.0
 noise = 0.005
@@ -62,13 +62,14 @@ landmarks = np.concatenate((landmarks1, landmarks2))
 # landmarks = np.concatenate((landmarks1, landmarks2))
 
 # read landmarks from file
-# landmarks = np.load('landmarks_temp.npy')
+landmarks = np.load('landmarks_temp.npy')
+
+# landmarks = np.random.uniform(0.5, size-0.5, size=(10,2))
+
 
 # np.save("landmarks_temp.npy", landmarks)
 
-landmarks = np.random.uniform(0.5, size-0.5, size=(10,2))
-
-sensor_range = 3
+sensor_range = 4
 motion_noise = np.array([0.04, 0.04, 0.01])
 measure_noise = np.array([0.01, 0.01])
 erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, switch=1)

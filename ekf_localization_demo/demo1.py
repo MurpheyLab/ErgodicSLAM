@@ -17,10 +17,10 @@ from math import pi
 # initialization
 ###################################
 
-tf = 1500
+tf = 100
 size = 20.0
 init_state = np.array([10., 10., 0.0])
-sensor_range = 4
+sensor_range = 40
 motion_noise = np.array([0.02, 0.02, 0.01])
 measure_noise = np.array([0.005, 0.005])
 mcov = np.diag(measure_noise)
@@ -50,7 +50,8 @@ ergCtrlDR1.init_phik = convert_phi2phik(ergCtrlTrue1.basis, t_dist.grid_vals, t_
 erg_ctrl_sim1 = simulation_slam(size, init_state, t_dist, modelTrue1, ergCtrlTrue1, envTrue1, modelDR1, ergCtrlDR1, envDR1, tf, landmarks, sensor_range, motion_noise, measure_noise)
 
 log1 = erg_ctrl_sim1.start(report=True, debug=True, update=1, update_threshold=1)
-erg_ctrl_sim1.animate(point_size=1, show_traj=True, title='EKF Localization Test')
+# erg_ctrl_sim1.animate(point_size=1, show_traj=True, title='EKF Localization Test')
+erg_ctrl_sim1.animate3(point_size=1, show_traj=True, title='EKF Localization Test')
 
 '''
 ###################################
