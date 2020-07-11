@@ -69,7 +69,7 @@ landmarks = np.load('landmarks_temp.npy')
 
 # np.save("landmarks_temp.npy", landmarks)
 
-sensor_range = 4
+sensor_range = 40
 motion_noise = np.array([0.04, 0.04, 0.01])
 measure_noise = np.array([0.01, 0.01])
 erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, switch=1)
