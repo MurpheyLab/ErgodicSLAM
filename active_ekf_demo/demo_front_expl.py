@@ -3,7 +3,7 @@ Testing EKF-SLAM simulation
 """
 
 import sys
-sys.path.append("/home/msun/Code/ErgodicBSP")
+sys.path.append("..")
 from rt_erg_lib.integrator_se2 import IntegratorSE2
 from rt_erg_lib.ergodic_control import RTErgodicControl
 from rt_erg_lib.active_target_dist import TargetDist
@@ -82,7 +82,7 @@ motion_noise = np.array([0.2, 0.15, 0.1]) ** 2
 # motion_noise = np.zeros(3)
 measure_noise = np.array([0.15, 0.1]) ** 2
 # measure_noise = np.array([1e-03, 1e-03]) ** 2
-erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise)
+erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, switch=1)
 erg_ctrl_sim.start(report=True, debug=False, update=4)
 
 
