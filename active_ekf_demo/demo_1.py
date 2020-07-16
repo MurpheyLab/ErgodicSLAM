@@ -3,7 +3,7 @@ Testing EKF-SLAM simulation
 """
 
 import sys
-sys.path.append("/home/msun/Code/ErgodicBSP")
+sys.path.append("..")
 from rt_erg_lib.integrator_se2 import IntegratorSE2
 from rt_erg_lib.ergodic_control import RTErgodicControl
 from rt_erg_lib.active_target_dist import TargetDist
@@ -72,8 +72,8 @@ erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue,
 erg_ctrl_sim.start(report=True, debug=False, update=3)
 
 # erg_ctrl_sim.animate_eval(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
-# erg_ctrl_sim.animate2(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
-erg_ctrl_sim.animate(point_size=2, alpha=4, show_traj=True, title='Landmarks Distribution Test', rate=50)
+erg_ctrl_sim.animate2(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
+# erg_ctrl_sim.animate(point_size=2, alpha=4, show_traj=True, title='Landmarks Distribution Test', rate=50)
 
 # erg_ctrl_sim.plot(point_size=1, save=None)
 # erg_ctrl_sim.path_reconstruct(save=None)

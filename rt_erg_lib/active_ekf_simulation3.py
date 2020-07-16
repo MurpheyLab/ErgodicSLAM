@@ -1,6 +1,6 @@
 '''
 ekf implemenatation with varying dimension
-penalty on covariance during ergodic prediction
+robot keeps track of unvisited area
 '''
 
 import matplotlib.pyplot as plt
@@ -53,6 +53,8 @@ class simulation_slam():
         self.curr_obsv = []
         self.switch = switch
         self.horizon = self.erg_ctrl_true.horizon
+
+        self.grid = None
 
     def start(self, report=False, debug=False, update=1, update_threshold=1e-3, snapshot=0):
         #########################
@@ -639,7 +641,7 @@ class simulation_slam():
         # return anim
 
     def animate2(self, point_size=1, alpha=1, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
-        fig = plt.gcf()
+        fig = plt.figure()
 
         ax1 = fig.add_subplot(121)
         [xy, vals] = self.init_t_dist.get_grid_spec()
@@ -661,10 +663,13 @@ class simulation_slam():
         # xt_dr = np.stack(self.log['trajectory_dr'])
         # points_dr = ax1.scatter([], [], s=point_size, c='cyan')
 
-        mean_est = np.stack(self.log['mean'])
-        xt_est = mean_est[:, 0:3]
+        # mean_est = np.stack(self.log['mean'])
+        mean_est = np.stack(self.log['trajectory_slam'])
+        xt_est = mean_est.copy()
         points_est = ax1.scatter([], [], s=point_size, color='green')
         agent_est = ax1.scatter([], [], s=point_size * 100, color='green', marker='8')
+
+        sim_traj = ax1.scatter([], [], s=point_size, c='purple')
 
         observation_lines = []
         landmark_ellipses = []
@@ -693,7 +698,7 @@ class simulation_slam():
                 points_true.set_offsets(np.array([xt_true[:i, 0], xt_true[:i, 1]]).T)
                 points_est.set_offsets(np.array([xt_est[:i, 0], xt_est[:i, 1]]).T)
                 agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
-
+                agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
             else:
                 agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
                 agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
@@ -710,7 +715,7 @@ class simulation_slam():
             for id in range(self.nLandmark):
                 landmark_ellipses[id].set_offsets(np.array([[], []]).T)
 
-            for id in range(self.nLandmark):
+            for id in range(int((mean.shape[0]-3)/2)):
                 if mean[2 + 2 * id + 1] == 0:
                     annot[id].set_text('')
                 else:
@@ -728,18 +733,35 @@ class simulation_slam():
                 point[0].set_ydata([])
 
             # observation model visualization
-            for observation in self.log['observations'][i]:
-                id = int(observation[0])
-                measurement = observation[1:]
-                loc_x = xt_true[i, 0] + measurement[0] * cos(xt_true[i, 2] + measurement[1])
-                loc_y = xt_true[i, 1] + measurement[0] * sin(xt_true[i, 2] + measurement[1])
-                sensor_points[id][0].set_xdata([xt_true[i, 0], loc_x])
-                sensor_points[id][0].set_ydata([xt_true[i, 1], loc_y])
+            idx = 0
+            for obsv in self.log['observations'][i]:
+                observation = obsv
+                lm = self.observe_landmark(agent_mean, observation)
+                sensor_points[idx][0].set_xdata([xt_true[i, 0], lm[0]])
+                sensor_points[idx][0].set_ydata([xt_true[i, 1], lm[1]])
+                idx += 1
 
             # visualize true path statistics
             path_true = xt_true[:i+1, self.model_true.explr_idx]
             ck_true = convert_traj2ck(self.erg_ctrl_true.basis, path_true)
             val_true = convert_ck2dist(self.erg_ctrl_true.basis, ck_true, size=self.size)
+
+            # visualize planning trajectory
+            if i<self.switch:
+                sim_traj.set_offsets([-1., -1.])
+            else:
+                mpc_ctrls = self.log['erg_ctrls'][i-self.switch]
+                mpc_traj = [xt_est[i][0:3]]
+                for k in range(self.horizon):
+                    ctrl = mpc_ctrls[k]
+                    state = mpc_traj[k].copy()
+                    state[0] += cos(state[2]) * ctrl[0] * 0.1
+                    state[1] += sin(state[2]) * ctrl[0] * 0.1
+                    state[2] += ctrl[1] * 0.1
+                    mpc_traj.append(state)
+                mpc_traj = np.array(mpc_traj)
+                sim_traj.set_offsets(mpc_traj[:, 0:2])
+
             # visualize target distribution
             t_dist = self.log['target_dist'][i]
             xy3, vals = t_dist.get_grid_spec()

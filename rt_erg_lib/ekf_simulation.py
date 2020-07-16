@@ -391,6 +391,8 @@ class simulation_slam():
             p_agent = self.generate_cov_ellipse(agent_mean, agent_cov, alpha=1)
             agent_ellipse.set_offsets(np.array([p_agent[0, :], p_agent[1, :]]).T)
 
+            print('tr: {}, det: {}'.format(np.trace(agent_cov), np.linalg.det(agent_cov)))
+
             # visualize predicted planning covariance ellipse
             if plan:
                 planned_mean = self.log['planning_mean'][i]

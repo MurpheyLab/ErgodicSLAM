@@ -3,7 +3,7 @@ Testing EKF-SLAM simulation
 """
 
 import sys
-sys.path.append("/home/msun/Code/ErgodicBSP")
+sys.path.append("..")
 from rt_erg_lib.integrator_se2 import IntegratorSE2
 from rt_erg_lib.ergodic_control import RTErgodicControl
 from rt_erg_lib.target_dist import TargetDist
@@ -32,13 +32,13 @@ ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=100, num_basis=15, batch_s
 ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
 """start simulation"""
-tf = 2000
+tf = 200
 # lanmark distribution 3: gathered at two corners
 landmarks1 = np.random.uniform(11.5, 19.0, size=(10, 2))
 landmarks2 = np.random.uniform(1.0, 9.5, size=(10, 2))
 landmarks = np.concatenate((landmarks1, landmarks2))
 
-sensor_range = 4
+sensor_range = 14
 motion_noise = np.array([0.2, 0.2, 0.1]) ** 2
 # motion_noise = np.zeros(3)
 measure_noise = np.array([0.1, 0.1]) ** 2
