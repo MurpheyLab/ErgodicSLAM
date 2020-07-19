@@ -1,11 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from scipy.stats import multivariate_normal as mvn
 
 num_pts = 50
 
-mean = np.load('belief_mean_snapshot_t200.npy')
-cov = np.load('belief_cov_snapshot_t200.npy')
+mean = np.load('belief_mean_snapshot_t100.npy')
+cov = np.load('belief_cov_snapshot_t100.npy')
 
 N = int((mean.shape[0]-1) / 2)
 print("size N: ", N)
@@ -51,7 +52,7 @@ for i in range(grid.shape[0]):
     for j in range(landmark_mean.shape[0]):
         l = landmark_mean[j]
         cov = landmark_cov[j]
-        vals[i] += mvn.pdf(r, l, cov)
+        vals[i] += mvn.pdf(r, l, cov * 100)
 
 # plot fim field
 xy = []
@@ -66,7 +67,7 @@ ax2.set_xlim(0, 20)
 ax2.set_ylim(0, 20)
 
 vals /= np.sum(vals)
-ax2.contourf(*xy, vals.reshape(num_pts,num_pts), levels=25)
+ax2.contourf(*xy, vals.reshape(num_pts,num_pts), levels=25, cmap=cm.hot)
 
 '''
 for i in range(landmark_mean.shape[0]):

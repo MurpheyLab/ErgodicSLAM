@@ -5,15 +5,16 @@ full expectation fim implementation
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from scipy.stats import multivariate_normal as mvn
 from tqdm import tqdm
 import time
 
 
-num_pts = 50
+num_pts = 80
 
-mean = np.load('belief_mean_snapshot_t50.npy')
-cov = np.load('belief_cov_snapshot_t50.npy')
+mean = np.load('belief_mean_snapshot_t100.npy')
+cov = np.load('belief_cov_snapshot_t100.npy')
 
 N = int((mean.shape[0]-1) / 2)
 print("size N: ", N)
@@ -68,7 +69,7 @@ dist_xy = np.sqrt(diff_x**2 + diff_y**2)
 
 range_flag_1 = 0.0 < dist_xy
 range_flag_1 = range_flag_1.astype(int)
-range_flag_2 = dist_xy < 4.0
+range_flag_2 = dist_xy < 4.0 # setup range limit here
 range_flag_2 = range_flag_2.astype(int)
 
 range_flag = range_flag_1 * range_flag_2
@@ -91,14 +92,20 @@ det = fim11 * fim22 - fim12 * fim21
 # det = fim11 + fim22
 det = det * range_flag
 
+
+# when we know priori of landmarks
 for i in range(landmark_mean.shape[0]):
-# for i in range(2):
-# for i in [1]:
+# for i in [7]:
     distr = mvn.pdf(grid, landmark_mean[i], landmark_cov[i] * 1)
+    # distr = np.log10(distr + 1.)
     scaled_det = det * distr[:, np.newaxis]
     det_vals = np.sum(scaled_det, axis=0)
     print("det_vals: ", np.sum(det_vals))
     vals += det_vals
+
+
+# when we don't
+# vals += np.sum(det, axis=0)
 
 print("elapsed time: ", time.time() - start_time)
 
@@ -135,7 +142,7 @@ print('sum(vals): ', np.sum(vals))
 if np.sum(vals) != 0:
     vals /= np.sum(vals)
 
-ax2.contourf(*xy, vals.reshape(num_pts,num_pts), levels=50)
+ax2.contourf(*xy, vals.reshape(num_pts,num_pts), levels=50, cmap=cm.hot)
 
 '''
 for i in range(landmark_mean.shape[0]):
