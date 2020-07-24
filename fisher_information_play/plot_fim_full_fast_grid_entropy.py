@@ -2,6 +2,7 @@
 full expectation fim implementation
 (fast version)
 plot with grid instead of contourf
+compute entropy/mutual infoamtion for og
 '''
 
 import numpy as np
@@ -16,8 +17,22 @@ import time
 
 num_pts = 50
 
-mean = np.load('belief_mean_snapshot_t50.npy')
-cov = np.load('belief_cov_snapshot_t50.npy')
+def entropy(c):
+    return -c*np.log(c+1e-10) - (1-c)*np.log(1-c+1e-10)
+
+def mutual_info(grid, og_vals, g):
+    mi = 0.
+    og = og_vals.copy()
+    for i in range(num_pts):
+        for j in range(num_pts):
+            cell = np.array([grid[0][i][j], grid[1][i][j]])
+            if (g[0]-cell[0])**2 + (g[1]-cell[1])**2 < 16:
+                og[i][j] = 1.
+            mi += entropy(og[i][j])
+    return mi
+
+mean = np.load('belief_mean_snapshot_t100.npy')
+cov = np.load('belief_cov_snapshot_t100.npy')
 
 N = int((mean.shape[0]-1) / 2)
 print("size N: ", N)
@@ -127,7 +142,7 @@ print("elapsed time: ", time.time() - start_time)
 # plot
 
 # plot robot and landmarks
-ax1 = fig.add_subplot(131)
+ax1 = fig.add_subplot(231)
 ax1.set_aspect('equal')
 ax1.set_xlim(0, 20)
 ax1.set_ylim(0, 20)
@@ -146,7 +161,7 @@ for g in grid.T:
         np.reshape(g, newshape=(num_pts, num_pts))
     )
 
-ax2 = fig.add_subplot(132)
+ax2 = fig.add_subplot(234)
 ax2.set_aspect('equal')
 # ax2.set_xlim(0, 20)
 # ax2.set_ylim(0, 20)
@@ -172,7 +187,7 @@ for i in range(landmark_mean.shape[0]):
 ############################################
 # OG
 og_vals = np.ones((num_pts, num_pts)) * 0.5
-ax3 = fig.add_subplot(133)
+ax3 = fig.add_subplot(232)
 ax3.set_aspect('equal')
 for i in range(num_pts):
     for j in range(num_pts):
@@ -180,9 +195,50 @@ for i in range(num_pts):
         for lm in landmark_mean:
             if (lm[0]-cell[0])**2 + (lm[1]-cell[1])**2 < 16:
                 og_vals[i][j] = 1.
+        '''
         if i == 0 or i == num_pts-1 or j == 0 or j == num_pts-1:
             og_vals[i][j] = 0.
+        '''
 cmap = plt.get_cmap('gray')
-p2 = ax3.pcolormesh(temp_grid[0], temp_grid[1], og_vals, cmap=cmap, edgecolors='k', linewidth=0.005)
+p2 = ax3.pcolormesh(temp_grid[0], temp_grid[1], og_vals, cmap=cmap, edgecolors='k', linewidth=0.004)
+
+
+###########################################
+# MI
+ax4 = fig.add_subplot(235)
+ax4.set_aspect('equal')
+mi_vals = np.zeros((num_pts, num_pts))
+
+for i in range(num_pts):
+    for j in range(num_pts):
+        if og_vals[i][j] == 1.:
+            cell = np.array([temp_grid[0][i][j], temp_grid[1][i][j]])
+            mi_vals[i][j] = mutual_info(temp_grid, og_vals, cell)
+print('mi_vals.max: ', mi_vals.max(), 'mi_vals.min: ', mi_vals.min())
+
+mi_max = mi_vals.max()
+for i in range(num_pts):
+    for j in range(num_pts):
+        if mi_vals[i][j] != 0.:
+            mi_vals[i][j] = mi_max - mi_vals[i][j]
+mi_vals /= np.sum(mi_vals)
+
+cmap = plt.get_cmap('hot')
+levels = MaxNLocator(nbins=125).tick_values(mi_vals.min(), mi_vals.max())
+norm = BoundaryNorm(levels, ncolors=cmap.N, clip=True)
+p3 = ax4.pcolormesh(temp_grid[0], temp_grid[1], mi_vals, cmap=cmap, norm=norm)
+
+
+###########################################
+# combine MI and FI
+ax5 = fig.add_subplot(236)
+ax5.set_aspect('equal')
+full_vals = 0.3 * vals + 0.7 * mi_vals
+
+cmap = plt.get_cmap('hot')
+levels = MaxNLocator(nbins=125).tick_values(full_vals.min(), full_vals.max())
+norm = BoundaryNorm(levels, ncolors=cmap.N, clip=True)
+p4 = ax5.pcolormesh(temp_grid[0], temp_grid[1], full_vals, cmap=cmap, norm=norm)
+
 
 plt.show()
