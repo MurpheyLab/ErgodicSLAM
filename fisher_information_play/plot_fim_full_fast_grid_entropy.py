@@ -233,7 +233,7 @@ p3 = ax4.pcolormesh(temp_grid[0], temp_grid[1], mi_vals, cmap=cmap, norm=norm)
 # combine MI and FI
 ax5 = fig.add_subplot(236)
 ax5.set_aspect('equal')
-full_vals = 0.3 * vals + 0.7 * mi_vals
+full_vals = 0.4 * vals + 0.6 * mi_vals
 
 cmap = plt.get_cmap('hot')
 levels = MaxNLocator(nbins=125).tick_values(full_vals.min(), full_vals.max())
