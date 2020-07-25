@@ -340,6 +340,7 @@ class TargetDist(object):
             temp_cov = cov[3+2*i:5+2*i, 3+2*i:5+2*i]
             clip_mean = np.array([xaxis[int(temp_mean[0]/dx)], yaxis[int(temp_mean[1]/dx)]])
             landmark_mean.append(clip_mean)
+            # landmark_mean.append(temp_mean)
             landmark_cov.append(temp_cov)
         landmark_mean = np.array(landmark_mean)
         landmark_cov = np.array(landmark_cov)
@@ -369,14 +370,15 @@ class TargetDist(object):
         det = fim11 * fim22 - fim12 * fim21
         det = det * range_flag
 
-        fim_vals = 0.
+        fim_vals = np.zeros(self.num_pts**2)
         for i in range(landmark_mean.shape[0]):
-            distr = mvn.pdf(self.grid, landmark_mean[i], landmark_cov[i] * 50.)
+            distr = mvn.pdf(self.grid, landmark_mean[i], landmark_cov[i] * 1.)
             scaled_det = det * distr[:, np.newaxis]
             det_vals = np.sum(scaled_det, axis=0)
             fim_vals += det_vals
         fim_vals = fim_vals.reshape(self.num_pts, self.num_pts)
-        fim_vals /= np.sum(fim_vals)
+        if np.sum(fim_vals) != 0.:
+            fim_vals /= np.sum(fim_vals)
 
         # mutual information
         mi_vals = np.zeros((self.num_pts, self.num_pts))
@@ -394,5 +396,5 @@ class TargetDist(object):
                     mi_vals[i][j] = full_entropy - np.sum(self.entropy(new_og))
         mi_vals /= np.sum(mi_vals)
 
-        # self.grid_vals = 0.7 * fim_vals + 0.3 * mi_vals
-        self.grid_vals = mi_vals
+        self.grid_vals = 0.7 * fim_vals + 0.3 * mi_vals
+        # self.grid_vals = mi_vals
