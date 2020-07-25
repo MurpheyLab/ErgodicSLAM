@@ -394,7 +394,8 @@ class TargetDist(object):
                     mi_flag = dist_flag * obsv_flag
                     new_og = og_vals + mi_flag
                     mi_vals[i][j] = full_entropy - np.sum(self.entropy(new_og))
-        mi_vals /= np.sum(mi_vals)
+        if np.sum(mi_vals) != 0:
+            mi_vals /= np.sum(mi_vals)
 
         self.grid_vals = 0.7 * fim_vals + 0.3 * mi_vals
         # self.grid_vals = mi_vals
