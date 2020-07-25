@@ -1,5 +1,7 @@
 '''
 ekf implemenatation with varying dimension
+mutual information
+plot through grids instead of contour
 '''
 
 import matplotlib.pyplot as plt
@@ -701,6 +703,9 @@ class simulation_slam():
 
         self.ax3_cb = None
 
+        temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts+1) for _ in range(2)])
+        cmap = plt.get_cmap('hot')
+
         def sub_animate(i):
             # visualize agent location / trajectory
             if (show_traj):
@@ -776,7 +781,8 @@ class simulation_slam():
             xy3, vals = t_dist.get_grid_spec()
             ax3.cla()
             ax3.set_title('Target Distribution')
-            ax3_countour = ax3.contourf(*xy3, vals, levels=20)
+            ax3_countour = ax3.contourf(*xy3, vals, levels=20, cmap=cmap)
+            # ax3_grid = ax3.pcolormesh(temp_grid[0], temp_grid[1], vals, cmap=cmap)
 
             # return matplotlib objects for animation
             ret = [points_true, agent_ellipse, points_est, agent_true, agent_est]
