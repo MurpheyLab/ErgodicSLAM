@@ -207,6 +207,7 @@ class simulation_slam():
             self.log['trajectory_slam'].append(mean[0:3].copy())
             self.log['covariance'].append(cov.copy())
 
+            # update OG
             for i in range(self.num_pts):
                 for j in range(self.num_pts):
                     cell = np.array([self.grid[0][i][j], self.grid[1][i][j]])
@@ -291,6 +292,12 @@ class simulation_slam():
         # return log for further visualization and evaluation
         print("simulation finished.")
         return self.log
+
+    def update_og(og_vals, mean_r, cov_r, size, sensor_range):
+        og = og_vals.copy()
+        mean = mean_r.copy()
+        cov = cov_r.copy()
+
 
     def range_bearing(self, agent, landmark):
         delta = landmark - agent[0:self.nStates - 1]

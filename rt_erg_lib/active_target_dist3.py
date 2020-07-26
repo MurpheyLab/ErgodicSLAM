@@ -338,7 +338,18 @@ class TargetDist(object):
         for i in range(int((meann.shape[0]-3)/2)):
             temp_mean = mean[3+2*i : 5+2*i]
             temp_cov = cov[3+2*i:5+2*i, 3+2*i:5+2*i]
-            clip_mean = np.array([xaxis[int(temp_mean[0]/dx)], yaxis[int(temp_mean[1]/dx)]])
+            clip_idx_x = int(temp_mean[0]/dx)
+            # in case estimation error cause exceeding to grids
+            if clip_idx_x > 49:
+                clip_idx_x = 49
+            if clip_idx_x < 0:
+                clip_idx_x = 0
+            clip_idx_y = int(temp_mean[1]/dx)
+            if clip_idx_y > 49:
+                clip_idx_y = 49
+            if clip_idx_y < 0:
+                clip_idx_y = 0
+            clip_mean = np.array([xaxis[clip_idx_x], yaxis[clip_idx_y]])
             landmark_mean.append(clip_mean)
             # landmark_mean.append(temp_mean)
             landmark_cov.append(temp_cov)
@@ -397,5 +408,5 @@ class TargetDist(object):
         if np.sum(mi_vals) != 0:
             mi_vals /= np.sum(mi_vals)
 
-        self.grid_vals = 0.6 * fim_vals + 0.4 * mi_vals
+        self.grid_vals = 0.8 * fim_vals + 0.2 * mi_vals
         # self.grid_vals = mi_vals

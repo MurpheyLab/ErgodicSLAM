@@ -1,13 +1,15 @@
 """
 Testing active EKF-SLAM simulation
 use mutual-fisher information as target
-landmarks: two cornerd (archieve)
+try to make area coverage more reliable (problem in mi_11)
+consider agent uncertainty in OG
+landmarks:
 params:
 size = 20
 erg_horizon = 100 (this has to be long for revisiting to happen)
 batch_size = -1 (remain unknown what'a proper one)
 tf = 2000 (usually reach full exploration around 1500)
-fim_weight = 0.6
+fim_weight = 0.8
 """
 
 import sys
@@ -66,12 +68,13 @@ ergCtrlDR.init_phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist
 # landmarks = np.concatenate((landmarks1, landmarks2))
 
 # lanmark distribution 3: mixed distribution
-# landmarks1 = np.random.uniform(12.0, 18.0, size=(10, 2))
+landmarks1 = np.random.uniform(2.0, 6.0, size=(5, 2))
 # landmarks2 = np.random.uniform(0.5, 19.5, size=(10, 2))
-# landmarks = np.concatenate((landmarks1, landmarks2))
+landmarks2 = np.array([[0.5,19.5], [1.5,19.0], [19.5,0.5], [19.5,19.5], [10.,10.], [9.,5.], [4.,8.]])
+landmarks = np.concatenate((landmarks1, landmarks2))
 
 # read landmarks from file
-landmarks = np.load('landmarks_temp_cornered.npy')
+# landmarks = np.load('landmarks_temp_cornered.npy')
 
 # landmarks = np.random.uniform(0.5, size-0.5, size=(10,2))
 

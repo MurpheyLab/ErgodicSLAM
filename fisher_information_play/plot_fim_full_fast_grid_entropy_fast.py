@@ -65,13 +65,15 @@ mcov = np.diag([0.0225, 0.01]) ** 2
 imcov = np.linalg.inv(mcov)
 # imcov = np.eye(2)
 
-'''
+
 """for debug only: make some data"""
 landmark_mean = np.array([[4., 4.],
                            [16., 16.]])
-landmark_cov = np.array([np.array([[0.0001, 0.00002], [0.00002, 0.0001]]),
+landmark_mean = np.array([np.array([xaxis[int(0.5/dx)], yaxis[int(19.5/dx)]]),
+                          np.array([xaxis[int(19.5/dx)], yaxis[int(0.5/dx)]])])
+landmark_cov = np.array([np.array([[0.001, 0.0005], [0.0005, 0.001]]),
                          np.array([[0.002, 0.0001], [0.0001, 0.002]])]) * 1
-'''
+
 
 # start computation
 vals = np.zeros(grid.shape[0])
@@ -106,11 +108,12 @@ fim22 = dm12 * (dm12*imcov[0,0] + dm22*imcov[1,0]) + dm22 * (dm12*imcov[0,1] + d
 det = fim11 * fim22 - fim12 * fim21
 # det = fim11 + fim22
 det = det * range_flag
+print('det.shape: ', det.shape)
 
 start2 = time.time()
 # when we know priori of landmarks
 for i in range(landmark_mean.shape[0]):
-    distr = mvn.pdf(grid, landmark_mean[i], landmark_cov[i] * 50.)
+    distr = mvn.pdf(grid, landmark_mean[i], landmark_cov[i] * 1.)
     # distr = np.log10(distr + 1.)
     scaled_det = det * distr[:, np.newaxis]
     det_vals = np.sum(scaled_det, axis=0)
