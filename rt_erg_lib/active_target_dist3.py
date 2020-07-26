@@ -397,5 +397,5 @@ class TargetDist(object):
         if np.sum(mi_vals) != 0:
             mi_vals /= np.sum(mi_vals)
 
-        self.grid_vals = 0.7 * fim_vals + 0.3 * mi_vals
+        self.grid_vals = 0.6 * fim_vals + 0.4 * mi_vals
         # self.grid_vals = mi_vals

@@ -781,7 +781,7 @@ class simulation_slam():
             xy3, vals = t_dist.get_grid_spec()
             ax3.cla()
             ax3.set_title('Target Distribution')
-            ax3_countour = ax3.contourf(*xy3, vals, levels=20, cmap=cmap)
+            ax3_countour = ax3.contourf(*xy3, vals, levels=40, cmap=cmap)
             # ax3_grid = ax3.pcolormesh(temp_grid[0], temp_grid[1], vals, cmap=cmap)
 
             # return matplotlib objects for animation
