@@ -16,9 +16,11 @@ grid_x = grid2[:,0]
 grid_y = grid2[:,1]
 
 mean = np.array([6., 12.])
-cov = np.eye(2) * 1e-01 * 5
+cov = np.eye(2) * 1e-03 * 5
 rv = mvn(mean=mean, cov=cov)
-prob = rv.pdf(grid2)
+prob = 0.5 * np.exp( -1. / (rv.pdf(grid2)+1e-09) ) ** 5
+print('det cov: ', np.linalg.det(cov))
+print('prob max: ', np.max(prob))
 
 start_1 = time.time()
 vals = np.ones(num_pts**2) * 0.5
@@ -45,7 +47,7 @@ print('time_2: ', time.time()-start_2)
 fig = plt.figure()
 ax = fig.add_subplot(111)
 cmap = plt.get_cmap('gray')
-levels = MaxNLocator(nbins=125).tick_values(vals.min(), vals.max())
+levels = MaxNLocator(nbins=25).tick_values(vals.min(), vals.max())
 norm = BoundaryNorm(levels, ncolors=cmap.N, clip=True)
 p = ax.pcolormesh(grid[0], grid[1], vals, cmap=cmap, edgecolors='k', linewidth=0.004, norm=norm)
 ax.set_aspect('equal')

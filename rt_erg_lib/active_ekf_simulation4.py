@@ -6,6 +6,8 @@ plot through grids instead of contour
 
 import matplotlib.pyplot as plt
 from matplotlib import animation
+from matplotlib.colors import BoundaryNorm
+from matplotlib.ticker import MaxNLocator
 import autograd.numpy as np
 from .target_dist import TargetDist
 from .utils import *
@@ -17,6 +19,7 @@ from tempfile import TemporaryFile
 import copy
 from time import time
 from scipy.linalg import block_diag
+from scipy.stats import multivariate_normal as mvn
 
 
 class simulation_slam():
@@ -52,6 +55,13 @@ class simulation_slam():
         self.og_vals = np.ones((self.num_pts, self.num_pts)) * 0.5
         self.raw_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts+1) for _ in range(2)])
         self.grid = [self.raw_grid[0][0:self.num_pts,0:self.num_pts], self.raw_grid[1][0:self.num_pts,0:self.num_pts]]
+        self.grid2 = np.c_[self.grid[0].ravel(), self.grid[1].ravel()]
+        self.grid_x = self.grid2[:,0]
+        self.grid_y = self.grid2[:,1]
+        self.diff_x = self.grid_x - self.grid_x[:,np.newaxis]
+        self.diff_y = self.grid_y - self.grid_y[:,np.newaxis]
+        self.dist_xy = np.sqrt(self.diff_x**2 + self.diff_y**2)
+        self.dist_flag = (self.dist_xy < self.sensor_range).astype(int)
         self.init_phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.t_dist.target_grid_vals, self.t_dist.grid)
 
         self.lm_id = []
@@ -68,13 +78,13 @@ class simulation_slam():
         self.dim = self.nStates + 2 * self.nLandmark
 
         mean = self.init_state.copy()
-        cov = np.zeros((self.nStates, self.nStates))
+        cov = np.ones((self.nStates, self.nStates)) * 1e-09
 
         ##########################
         # simulation loop
         ##########################
         self.log = {'tf': self.tf, 'trajectory_true': [], 'trajectory_dr': [], 'true_landmarks': [], 'observations': [], 'mean': [],
-                'covariance': [], 'planning_mean': [], 'planning_cov': [], 'target_dist': [], 'error':[], 'uncertainty':[], 'metric_true':[], 'metric_est':[], 'metric_error':[], 'landmarks':self.landmarks, 'trajectory_slam':[], 'erg_ctrls':[]}
+                'covariance': [], 'planning_mean': [], 'planning_cov': [], 'target_dist': [], 'error':[], 'uncertainty':[], 'metric_true':[], 'metric_est':[], 'metric_error':[], 'landmarks':self.landmarks, 'trajectory_slam':[], 'erg_ctrls':[], 'og_vals':[]}
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
@@ -208,12 +218,32 @@ class simulation_slam():
             self.log['covariance'].append(cov.copy())
 
             # update OG
+            '''
             for i in range(self.num_pts):
                 for j in range(self.num_pts):
                     cell = np.array([self.grid[0][i][j], self.grid[1][i][j]])
                     if (cell[0]-mean[0])**2 + (cell[1]-mean[1])**2 < 16 and self.og_vals[i][j] == 0.5:
                         self.og_vals[i][j] = 1.
+            '''
+            dx = 1.0 * self.size / self.num_pts
+            clip_idx_x = int(mean[0]/dx)
+            if clip_idx_x > 49:
+                clip_idx_x = 49
+            if clip_idx_x < 0:
+                clip_idx_x = 0
+            clip_idx_y = int(mean[1]/dx)
+            if clip_idx_y > 49:
+                clip_idx_y = 49
+            if clip_idx_y < 0:
+                clip_idx_y = 0
+            clip_mean = np.array([self.grid[0][0][clip_idx_x], self.grid[0][0][clip_idx_y]])
 
+            rv = mvn(mean=clip_mean[0:2], cov=cov[0:2, 0:2])
+            prob = 0.5 * np.exp( -1. / (rv.pdf(self.grid2)+1e-09) ) ** 2.
+            addi = np.sum(self.dist_flag * prob[:,np.newaxis], axis=0)
+            self.og_vals += addi.reshape(self.num_pts, self.num_pts)
+            self.og_vals = np.clip(self.og_vals, a_min=None, a_max=1.)
+            self.log['og_vals'].append(self.og_vals.copy())
             #########################
             # Record error and uncertainty for evaluation
             #########################
@@ -241,6 +271,9 @@ class simulation_slam():
                 self.erg_ctrl_dr.target_dist.update_fim_2(self.nStates, self.nLandmark, self.observed_landmarks, mean, cov, self.mcov_inv, threshold=update_threshold)
             if update == 6:
                 self.erg_ctrl_dr.target_dist.update_mi_1(mean, cov, self.mcov_inv, self.og_vals)
+            if update == 7:
+                self.erg_ctrl_dr.target_dist.update_mi_2(mean, cov, self.mcov_inv, self.og_vals)
+
 
             # update phi for ergodic controller
             self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals, self.erg_ctrl_dr.target_dist.grid)
@@ -790,6 +823,168 @@ class simulation_slam():
             ax3.set_title('Target Distribution')
             ax3_countour = ax3.contourf(*xy3, vals, levels=40, cmap=cmap)
             # ax3_grid = ax3.pcolormesh(temp_grid[0], temp_grid[1], vals, cmap=cmap)
+
+            # return matplotlib objects for animation
+            ret = [points_true, agent_ellipse, points_est, agent_true, agent_est]
+            for item in sensor_points:
+                ret.append(item[0])
+            for item in landmark_ellipses:
+                ret.append(item)
+            for item in annot:
+                ret.append(item)
+            return ret
+
+        anim = animation.FuncAnimation(fig, sub_animate, frames=self.tf, interval=(1000 / rate))
+        if save is not None:
+            Writer = animation.writers['ffmpeg']
+            writer = Writer(fps=40, metadata=dict(artist='simulation_slam'), bitrate=5000)
+            anim.save(save, writer=writer)
+        plt.show()
+        # return anim
+
+    def animate3(self, point_size=1, alpha=1, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
+        fig = plt.figure()
+
+        ax1 = fig.add_subplot(131)
+        [xy, vals] = self.init_t_dist.get_grid_spec()
+        # ax1.contourf(*xy, vals, levels=20)
+        ax1.scatter(self.landmarks[:, 0], self.landmarks[:, 1], color='white', marker='P')
+        ax1.set_aspect('equal', 'box')
+        ax1.set_title(title)
+        ax1.set_xlim(0, self.size)
+        ax1.set_ylim(0, self.size)
+
+        ax3 = fig.add_subplot(132)
+        ax3.set_aspect('equal', 'box')
+        ax3.set_title('Target Distribution')
+
+        ax2 = fig.add_subplot(133)
+        ax2.set_aspect('equal')
+        ax2.set_title('Occupancy Grid')
+
+        xt_true = np.stack(self.log['trajectory_true'])
+        points_true = ax1.scatter([], [], s=point_size, color='red')
+        agent_true = ax1.scatter([], [], s=point_size * 100, color='red', marker='8')
+
+        # xt_dr = np.stack(self.log['trajectory_dr'])
+        # points_dr = ax1.scatter([], [], s=point_size, c='cyan')
+
+        # mean_est = np.stack(self.log['mean'])
+        mean_est = np.stack(self.log['trajectory_slam'])
+        xt_est = mean_est.copy()
+        points_est = ax1.scatter([], [], s=point_size, color='green')
+        agent_est = ax1.scatter([], [], s=point_size * 100, color='green', marker='8')
+
+        sim_traj = ax1.scatter([], [], s=point_size, c='purple')
+
+        observation_lines = []
+        landmark_ellipses = []
+        for id in range(self.landmarks.shape[0]):
+            observation_lines.append(ax1.plot([], [], color='orange'))
+            landmark_ellipses.append(ax1.scatter([], [], s=point_size, c='blue'))
+
+        agent_ellipse = ax1.scatter([], [], s=point_size, c='green')
+
+        ax1.legend([agent_true, agent_est], ['True Path', 'Estimated Path'])
+
+        annot = []
+        for i in range(self.landmarks.shape[0]):
+            annot.append(ax1.annotate('', [0.5, 0.5], size=10))
+
+        sensor_points = []
+        for id in range(self.landmarks.shape[0]):
+            sensor_point = ax1.plot([], [], color='orange')
+            sensor_points.append(sensor_point)
+
+        self.ax3_cb = None
+
+        temp_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts+1) for _ in range(2)])
+        cmap = plt.get_cmap('hot')
+        cmap2 = plt.get_cmap('gray')
+        levels = MaxNLocator(nbins=50).tick_values(0.5, 1.0)
+        norm = BoundaryNorm(levels, ncolors=cmap2.N, clip=True)
+        def sub_animate(i):
+            # visualize agent location / trajectory
+            if (show_traj):
+                points_true.set_offsets(np.array([xt_true[:i, 0], xt_true[:i, 1]]).T)
+                points_est.set_offsets(np.array([xt_est[:i, 0], xt_est[:i, 1]]).T)
+                agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
+                agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
+            else:
+                agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
+                agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
+
+            # visualize agent covariance matrix as ellipse
+            mean = self.log['mean'][i]
+            agent_mean = mean[0:self.nStates]
+            cov = self.log['covariance'][i]
+            agent_cov = cov[0:self.nStates - 1, 0:self.nStates - 1]
+            p_agent = self.generate_cov_ellipse(agent_mean, agent_cov, alpha=alpha)
+            agent_ellipse.set_offsets(np.array([p_agent[0, :], p_agent[1, :]]).T)
+
+            # visualize landmark mean and covariance
+            for id in range(self.nLandmark):
+                landmark_ellipses[id].set_offsets(np.array([[], []]).T)
+
+            for id in range(int((mean.shape[0]-3)/2)):
+                if mean[2 + 2 * id + 1] == 0:
+                    annot[id].set_text('')
+                else:
+                    landmark_mean = mean[2 + 2 * id + 1: 2 + 2 * id + 2 + 1]
+                    landmark_cov = cov[2 + 2 * id + 1: 2 + 2 * id + 2 + 1, 2 + 2 * id + 1: 2 + 2 * id + 2 + 1]
+                    p_landmark = self.generate_landmark_ellipse(landmark_mean, landmark_cov)
+                    landmark_ellipses[id].set_offsets(np.array([p_landmark[0, :], p_landmark[1, :]]).T)
+                    annot[id].set_text("{:.2E}".format(np.linalg.det(landmark_cov)))
+                    annot[id].set_x(landmark_mean[0])
+                    annot[id].set_y(landmark_mean[1])
+
+            # clear observation model visualization
+            for point in sensor_points:
+                point[0].set_xdata([])
+                point[0].set_ydata([])
+
+            # observation model visualization
+            idx = 0
+            for obsv in self.log['observations'][i]:
+                observation = obsv
+                lm = self.observe_landmark(agent_mean, observation)
+                sensor_points[idx][0].set_xdata([xt_true[i, 0], lm[0]])
+                sensor_points[idx][0].set_ydata([xt_true[i, 1], lm[1]])
+                idx += 1
+
+            # visualize true path statistics
+            path_true = xt_true[:i+1, self.model_true.explr_idx]
+            ck_true = convert_traj2ck(self.erg_ctrl_true.basis, path_true)
+            val_true = convert_ck2dist(self.erg_ctrl_true.basis, ck_true, size=self.size)
+
+            # visualize planning trajectory
+            if i<self.switch:
+                sim_traj.set_offsets([-1., -1.])
+            else:
+                mpc_ctrls = self.log['erg_ctrls'][i-self.switch]
+                mpc_traj = [xt_est[i][0:3]]
+                for k in range(self.horizon):
+                    ctrl = mpc_ctrls[k]
+                    state = mpc_traj[k].copy()
+                    state[0] += cos(state[2]) * ctrl[0] * 0.1
+                    state[1] += sin(state[2]) * ctrl[0] * 0.1
+                    state[2] += ctrl[1] * 0.1
+                    mpc_traj.append(state)
+                mpc_traj = np.array(mpc_traj)
+                sim_traj.set_offsets(mpc_traj[:, 0:2])
+
+            # visualize target distribution
+            t_dist = self.log['target_dist'][i]
+            xy3, vals = t_dist.get_grid_spec()
+            ax3.cla()
+            ax3.set_title('Target Distribution')
+            ax3_countour = ax3.contourf(*xy3, vals, levels=40)#, cmap=cmap)
+            # ax3_grid = ax3.pcolormesh(temp_grid[0], temp_grid[1], vals, cmap=cmap)
+
+            # visualize occupancy grid
+            ax2.cla()
+            ax2.set_title('Occupancy Grid')
+            ax2_grid = ax2.pcolormesh(temp_grid[0], temp_grid[1], self.log['og_vals'][i], cmap=cmap2, edgecolors='k', linewidth=0.004, norm=norm)
 
             # return matplotlib objects for animation
             ret = [points_true, agent_ellipse, points_est, agent_true, agent_est]

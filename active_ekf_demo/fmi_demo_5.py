@@ -24,7 +24,7 @@ from math import sin, cos
 from math import pi
 
 """initialization"""
-tf = 2000
+tf = 1500
 size = 20.0
 # size = 25.0
 noise = 0.005
@@ -69,7 +69,7 @@ ergCtrlDR.init_phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist
 
 # lanmark distribution 3: mixed distribution
 landmarks1 = np.random.uniform(2.0, 6.0, size=(5, 2))
-# landmarks2 = np.random.uniform(0.5, 19.5, size=(10, 2))
+# landmarks2 = np.random.uniform(0.5, 0.5, size=(2, 2))
 landmarks2 = np.array([[0.5,19.5], [1.5,19.0], [19.5,0.5], [19.5,19.5], [10.,10.], [9.,5.], [4.,8.]])
 landmarks = np.concatenate((landmarks1, landmarks2))
 
@@ -85,10 +85,11 @@ sensor_range = 4
 motion_noise = np.array([0.04, 0.04, 0.01])
 measure_noise = np.array([0.01, 0.01])
 erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, switch=1)
-erg_ctrl_sim.start(report=True, debug=False, update=6)
+erg_ctrl_sim.start(report=True, debug=False, update=7)
 
 # erg_ctrl_sim.animate_eval(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
-erg_ctrl_sim.animate2(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
+# erg_ctrl_sim.animate2(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
+erg_ctrl_sim.animate3(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=100)
 # erg_ctrl_sim.animate(point_size=1, show_traj=True, plan=False, title='Landmarks Distribution')
 
 # erg_ctrl_sim.plot(point_size=1, save=None)
