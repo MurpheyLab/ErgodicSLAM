@@ -51,6 +51,12 @@ for i in range(N-1):
         landmark_mean.append(clip_mean)
     else:
         pass
+####
+'''
+landmark_mean.append([13.5, 10.])
+landmark_cov.append(temp_cov)
+'''
+####
 landmark_mean = np.array(landmark_mean)
 landmark_cov = np.array(landmark_cov)
 print('landmark_mean:\n', landmark_mean)
@@ -67,12 +73,14 @@ imcov = np.linalg.inv(mcov)
 
 
 """for debug only: make some data"""
+'''
 landmark_mean = np.array([[4., 4.],
                            [16., 16.]])
 landmark_mean = np.array([np.array([xaxis[int(0.5/dx)], yaxis[int(19.5/dx)]]),
                           np.array([xaxis[int(19.5/dx)], yaxis[int(0.5/dx)]])])
 landmark_cov = np.array([np.array([[0.001, 0.0005], [0.0005, 0.001]]),
                          np.array([[0.002, 0.0001], [0.0001, 0.002]])]) * 1
+'''
 
 
 # start computation
@@ -189,7 +197,9 @@ for i in range(num_pts):
             og_vals[i][j] = 0.
         '''
 cmap = plt.get_cmap('gray')
-p2 = ax3.pcolormesh(temp_grid[0], temp_grid[1], og_vals, cmap=cmap, edgecolors='k', linewidth=0.004)
+levels = MaxNLocator(nbins=50).tick_values(0., 1.)
+norm = BoundaryNorm(levels, ncolors=cmap.N, clip=True)
+p2 = ax3.pcolormesh(temp_grid[0], temp_grid[1], og_vals, cmap=cmap, norm=norm, edgecolors='k', linewidth=0.004)
 
 
 ###########################################
@@ -278,7 +288,7 @@ p3 = ax4.pcolormesh(temp_grid[0], temp_grid[1], mi_vals, cmap=cmap, norm=norm)
 # combine MI and FI
 ax5 = fig.add_subplot(236)
 ax5.set_aspect('equal')
-full_vals = 0.7 * vals + 0.3 * mi_vals
+full_vals = 0.5 * vals + 0.5 * mi_vals
 
 cmap = plt.get_cmap('hot')
 levels = MaxNLocator(nbins=125).tick_values(full_vals.min(), full_vals.max())

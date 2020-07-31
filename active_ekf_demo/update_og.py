@@ -16,7 +16,7 @@ grid_x = grid2[:,0]
 grid_y = grid2[:,1]
 
 mean = np.array([6., 12.])
-cov = np.eye(2) * 1e-02 * 5
+cov = np.eye(2) * 1e-01
 rv = mvn(mean=mean, cov=cov)
 prob = 0.5 * np.exp( -1. / (rv.pdf(grid2)+1e-09) ) ** 2
 print('det cov: ', np.linalg.det(cov))
