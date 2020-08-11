@@ -9,8 +9,8 @@ size = 20
 erg_horizon = 100 (this has to be long for revisiting to happen)
 batch_size = -1 (remain unknown what'a proper one)
 tf = 2000 (usually reach full exploration around 1500)
-fim_weight = 0.5 * 0.2
-mi_weight = 0.5 * 0.2 (this can decrase ergodicity weight)
+fim_weight = 0.8 * 0.2
+mi_weight = 0.2 * 0.2 (this can decrase ergodicity weight)
 """
 
 import sys
@@ -19,13 +19,13 @@ from rt_erg_lib.integrator_se2 import IntegratorSE2
 from rt_erg_lib.ergodic_control import RTErgodicControl
 from rt_erg_lib.active_target_dist3 import TargetDist
 from rt_erg_lib.utils import *
-from rt_erg_lib.active_ekf_simulation4 import simulation_slam
+from rt_erg_lib.active_ekf_simulation5 import simulation_slam
 import autograd.numpy as np
 from math import sin, cos
 from math import pi
 
 """initialization"""
-tf = 200
+tf = 500
 size = 20.0
 # size = 25.0
 noise = 0.005
@@ -91,8 +91,7 @@ erg_ctrl_sim.start(report=True, debug=False, update=7)
 
 # erg_ctrl_sim.animate_eval(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
 # erg_ctrl_sim.animate2(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
-erg_ctrl_sim.animate4(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=100)
+# erg_ctrl_sim.animate4(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=100)
 # erg_ctrl_sim.animate(point_size=1, show_traj=True, plan=False, title='Landmarks Distribution')
 
-# erg_ctrl_sim.plot(point_size=1, save=None)
-# erg_ctrl_sim.path_reconstruct(save=None)
+erg_ctrl_sim.evaluate()
