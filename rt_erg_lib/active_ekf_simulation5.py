@@ -560,7 +560,7 @@ class simulation_slam():
         traj_true = plt.scatter(xt_true[:self.tf, 0], xt_true[:self.tf, 1], s=point_size, c='red')
         # xt_dr = np.stack(self.log['trajectory_dr'])
         # traj_dr = plt.scatter(xt_dr[:self.tf, 0], xt_dr[:self.tf, 1], s=point_size, c='cyan')
-        xt_est = np.stack(self.log['mean'])
+        xt_est = np.stack(self.log['trajectory_slam'])
         traj_est = plt.scatter(xt_est[:self.tf, 0], xt_est[:self.tf, 1], s=point_size, c='green')
 
         # plt.legend([traj_true, traj_dr, traj_est], ['True Path', 'Dead Reckoning Path', 'Estimated Path'])
