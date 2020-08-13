@@ -262,6 +262,13 @@ class simulation_slam():
         cov = covv.copy()
         obj = 0.
 
+        # test attractor
+        robot_mean = mean[0:2]
+        attractor = mean[0:2] + np.array([-1.0, 1.0])
+        mean = np.concatenate((mean, attractor))
+        cov = np.block([[cov, np.zeros((cov.shape[0], 2))], [np.zeros((2, cov.shape[0])), np.eye(2)*1e-12]])
+        # obsv_lm = np.concatenate((obsv_lmm, [ int((len(mean)-3)/2)+1 ]))
+
         for t in range(horizon):
             ctrl = ctrls[2*t:2*t+2]
             # obj += 50. ** np.linalg.norm(ctrl) - 1.
