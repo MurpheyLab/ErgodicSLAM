@@ -244,18 +244,6 @@ class simulation_slam():
         controls = res.x.reshape(horizon, 2)
         return controls
 
-    def mpc_constraint(self, ut, horizon):
-        cons = []
-        for i in range(horizon):
-            con1 = {'type':'ineq', 'fun': lambda u: u[i][0]+3.}
-            cons.append(con1)
-            con2 = {'type':'ineq', 'fun': lambda u: -u[i][0]+3.}
-            cons.append(con2)
-            con3 = {'type':'ineq', 'fun': lambda u: u[i][1]+2.}
-            cons.append(con3)
-            con4 = {'type':'ineq', 'fun': lambda u: -u[i][0]+2.}
-        return cons
-
     def mpc_objective(self, meann, covv, ctrls, horizon):
         '''
         obsv_lm contains id for landmarks being observed in mean
