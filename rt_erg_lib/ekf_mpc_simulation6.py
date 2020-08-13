@@ -1,3 +1,8 @@
+"""
+based on continuous objective version
+add attractor
+"""
+
 import matplotlib.pyplot as plt
 from matplotlib import animation
 import autograd.numpy as np
@@ -5,7 +10,7 @@ from .utils import convert_ck2dist, convert_traj2ck, normalize_angle
 from tqdm import tqdm
 from numpy import sin, cos, sqrt
 import math
-from math import pi, e
+from math import pi
 from tempfile import TemporaryFile
 from scipy.optimize import minimize
 from scipy.linalg import block_diag
@@ -40,6 +45,7 @@ class simulation_slam():
         self.threshold = 0.
 
         self.lm_id = []
+        self.obsv_lm = []
         self.static_test = static_test
         self.horizon = horizon
         self.switch = switch
@@ -56,6 +62,8 @@ class simulation_slam():
         cov = np.zeros((self.nStates, self.nStates))
         mean[0:3] = self.init_state
 
+        obsv_lm = []
+
         ##########################
         # simulation loop
         ##########################
@@ -71,10 +79,11 @@ class simulation_slam():
             # generate control and measurement data
             #########################
             # this is what robot thinks it's doing
-            if t < self.switch:  # debug mode: robot runs a circle
-                ctrl = np.array([2.5, 0.4])
+            if t < self.switch: # default control
+                ctrl = np.array([2.8, 0.4])
             else:
-                mpc_ctrls = self.mpc_planning(mean, cov, ctrl, horizon=self.horizon)
+                obsv_lm = np.array([self.lm_id.index(item) for item in self.curr_obsv])
+                mpc_ctrls = self.mpc_planning(mean, cov, ctrl, horizon=self.horizon, obsv_lm=obsv_lm)
                 ctrl = mpc_ctrls[0]
                 self.log['mpc_ctrls'].append(mpc_ctrls)
             state_dr = self.env_dr.step(ctrl)
@@ -233,18 +242,19 @@ class simulation_slam():
         lm_y = agent[1] + obsv[0] * sin(agent[2] + obsv[1])
         return np.array([lm_x, lm_y])
 
-    def mpc_planning(self, meann, covv, ctrl, horizon):
+    def mpc_planning(self, meann, covv, ctrl, horizon, obsv_lm):
         init_ctrls = np.array([ctrl.copy() for _ in range(horizon)]).reshape(-1)
         mean = meann.copy()
         cov = covv.copy()
 
-        objective = lambda ctrls : self.mpc_objective(mean, cov, ctrls.reshape(horizon,2), horizon)
+        objective = lambda ctrls : self.mpc_objective(mean, cov, ctrls, horizon, obsv_lm)
         bounds = [[-2., 2.] for _ in range(horizon*2)]
-        res = minimize(objective, init_ctrls, method='trust-constr', bounds=bounds, options={'disp':True})
+        res = minimize(objective, x0=init_ctrls, method='trust-constr', bounds=bounds, options={'disp':True,})# 'gtol':1e-12, 'xtol':1e-12})
+        # res = minimize(objective, init_ctrls, method='BFGS', tol=1e-10, options={'disp':True})
         controls = res.x.reshape(horizon, 2)
         return controls
 
-    def mpc_objective(self, meann, covv, ctrls, horizon):
+    def mpc_objective(self, meann, covv, ctrls, horizon, obsv_lm):
         '''
         obsv_lm contains id for landmarks being observed in mean
         '''
@@ -253,23 +263,9 @@ class simulation_slam():
         obj = 0.
 
         for t in range(horizon):
-            # predict observation
-            observations = []
-            landmarks = mean[3:].reshape(-1,2)
-            obsv_lm = []
-            idx = -1
-            r = mean[0:3]
-            for lm in landmarks:
-                idx += 1
-                dist = np.sqrt((r[0]-lm[0])**2 + (r[1]-lm[1])**2)
-                if dist <= self.sensor_range:
-                    obsv_lm.append(idx)
-            obsv_lm = np.array(obsv_lm)
-
-            # predict motion
-            ctrl = ctrls[t]
+            ctrl = ctrls[2*t:2*t+2]
+            # obj += 50. ** np.linalg.norm(ctrl) - 1.
             ctrl_norm = np.linalg.norm(ctrl)
-            obj += 50 ** (ctrl_norm) - 1.
             G = np.eye(mean.shape[0])
             G[0][2] = -sin(mean[2]) * ctrl[0] * 0.1
             G[1][2] =  cos(mean[2]) * ctrl[0] * 0.1
@@ -287,7 +283,6 @@ class simulation_slam():
             mean += g * 0.1
             mean[2] = normalize_angle(mean[2])
 
-            # predict correction
             num_obsv = obsv_lm.shape[0]
             H = np.zeros((num_obsv*2, mean.shape[0]))
             r = mean[0:3].copy()
@@ -314,25 +309,29 @@ class simulation_slam():
             K = cov @ H.T @ np.linalg.inv(H @ cov @ H.T + BigQ)
             cov = cov - K @ H @ cov
 
-        # test A-optimality
-        return np.trace(cov)
+        # print('cov: ', np.exp( np.log( (np.linalg.det(cov))**(1/mean.shape[0]) ) ) )# + obj * 0.00000001 )
+        # print('obj: ', obj * 0.000001)
+
+        # A-optimality
+        return np.trace(cov) #+ obj * 0.00000001
 
         # test D-optimality: 0
-        # return np.linalg.det(cov)
+        # return np.linalg.det(cov) + obj * 0.00000001
 
         # test D-optimality: 1
-        # return np.exp(np.log(np.linalg.det(cov) ** (1./cov.shape[0])))
+        # return np.exp( np.log( (np.linalg.det(cov))**(1/mean.shape[0]) ) ) + obj * 0.00000001
 
         # test D-optimality: 2
-        # obj = np.linalg.det(cov) ** (1./cov.shape[0])
-        # print('obj: ', obj)
-        # return obj
-
-        # test D-optimality: 3
-        # return -np.log( np.linalg.det(cov) )
+        '''
+        obj = np.linalg.det(cov[0:3, 0:3])
+        num_lm = int((mean.shape[0]-3) / 2)
+        for i in range(num_lm):
+            obj += np.linalg.det(cov[3+i*2:5+i*2, 3+i*2:5+i*2])
+        return obj
+        '''
 
         # test E-optimality
-        # return 0.5 * np.log(2*pi*e)**cov.shape[0] * np.linalg.norm(cov)
+        # return 0.5 * np.log(2*np.pi*np.e)**mean.shape[0] * np.linalg.norm(cov)
 
     # mpc-based implementaton of ekf-ml prediction,
     #   assume all landmarks observed at last time step
@@ -580,7 +579,7 @@ class simulation_slam():
                 sensor_points[id][0].set_ydata([xt_true[i, 1], lm[1]])
                 id += 1
 
-            if i<self.switch:
+            if i < self.switch:
                 sim_traj.set_offsets([-1., -1.])
             else:
                 mpc_ctrls = self.log['mpc_ctrls'][i-self.switch]

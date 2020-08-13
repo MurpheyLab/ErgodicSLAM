@@ -9,7 +9,7 @@ from rt_erg_lib.integrator_se2 import IntegratorSE2
 from rt_erg_lib.ergodic_control import RTErgodicControl
 from rt_erg_lib.target_dist import TargetDist
 from rt_erg_lib.utils import *
-from rt_erg_lib.ekf_mpc_simulation5 import simulation_slam
+from rt_erg_lib.ekf_mpc_simulation4 import simulation_slam
 import autograd.numpy as np
 
 """initialization"""
@@ -37,19 +37,19 @@ ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=horizon, num_basis=num_bas
 ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
 """start simulation"""
-tf = 50
+tf = 1000
 # lanmark distribution 1: uniform
-landmarks1 = np.random.uniform(0.5, 7.5, size=(6, 2))
-landmarks2 = np.random.uniform(12.5, 19.5, size=(4, 2))
-landmarks = np.concatenate((landmarks1, landmarks2))
+# landmarks1 = np.random.uniform(0.5, 7.5, size=(6, 2))
+# landmarks2 = np.random.uniform(12.5, 19.5, size=(4, 2))
+# landmarks = np.concatenate((landmarks1, landmarks2))
 
-landmarks = np.random.uniform(0.5, 19.5, size=(30, 2))
+landmarks = np.random.uniform(0.5, 19.5, size=(15, 2))
 # landmarks = np.array([[6., 14.]])
 
 sensor_range = 5
 motion_noise = np.array([0.04, 0.04, 0.01])
 measure_noise = np.array([0.01, 0.01])
-erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, static_test=45, horizon=10, switch=1)
+erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, static_test=45, horizon=3, switch=1)
 erg_ctrl_sim.start(report=True, debug=True)
 erg_ctrl_sim.animate(point_size=1, show_traj=True, plan=False, title='Landmarks Distribution')
 # erg_ctrl_sim.plot(point_size=1, save=None)

@@ -9,6 +9,7 @@ from math import pi, e
 from tempfile import TemporaryFile
 from scipy.optimize import minimize
 from scipy.linalg import block_diag
+import time
 
 
 class simulation_slam():
@@ -260,6 +261,7 @@ class simulation_slam():
         '''
         obsv_lm contains id for landmarks being observed in mean
         '''
+        # start_time = time.time()
         mean = meann.copy()
         cov = covv.copy()
         obj = 0.
@@ -325,6 +327,8 @@ class simulation_slam():
 
             K = cov @ H.T @ np.linalg.inv(H @ cov @ H.T + BigQ)
             cov = cov - K @ H @ cov
+
+        # print('objective evaluation: ', time.time() - start_time)
 
         # test A-optimality
         return np.trace(cov)
