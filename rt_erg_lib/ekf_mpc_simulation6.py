@@ -5,6 +5,8 @@ add attractor
 
 import matplotlib.pyplot as plt
 from matplotlib import animation
+from matplotlib.colors import BoundaryNorm
+from matplotlib.ticker import MaxNLocator
 import autograd.numpy as np
 from .utils import convert_ck2dist, convert_traj2ck, normalize_angle
 from tqdm import tqdm
@@ -18,7 +20,7 @@ from scipy.linalg import block_diag
 
 class simulation_slam():
     def __init__(self, size, init_state, t_dist, model_true, erg_ctrl_true, env_true, model_dr, erg_ctrl_dr, env_dr, tf,
-                 landmarks, sensor_range, motion_noise, measure_noise, static_test, horizon, switch):
+                 landmarks, sensor_range, motion_noise, measure_noise, static_test, horizon, switch, num_pts):
         self.size = size
         self.init_state = init_state
         self.tf = tf
@@ -49,6 +51,19 @@ class simulation_slam():
         self.static_test = static_test
         self.horizon = horizon
         self.switch = switch
+        self.attractor = None
+
+        self.num_pts = num_pts
+        self.og_vals = np.ones(self.num_pts * self.num_pts) * 0.5
+        self.raw_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts+1) for _ in range(2)])
+        self.grid = [self.raw_grid[0][0:self.num_pts,0:self.num_pts], self.raw_grid[1][0:self.num_pts,0:self.num_pts]]
+        self.grid2 = np.c_[self.grid[0].ravel(), self.grid[1].ravel()]
+        self.grid_x = self.grid2[:,0]
+        self.grid_y = self.grid2[:,1]
+        self.diff_x = self.grid_x - self.grid_x[:,np.newaxis]
+        self.diff_y = self.grid_y - self.grid_y[:,np.newaxis]
+        self.dist_xy = np.sqrt(self.diff_x**2 + self.diff_y**2)
+        self.dist_flag = (self.dist_xy < self.sensor_range).astype(int)
 
     def start(self, report=False, debug=False):
         #########################
@@ -68,7 +83,7 @@ class simulation_slam():
         # simulation loop
         ##########################
         self.log = {'trajectory_true': [], 'trajectory_dr': [], 'true_landmarks': [], 'observations': [], 'mean': [], 'trajectory_slam': [],
-                'covariance': [], 'planning_mean': [], 'planning_cov': [], 'mpc_ctrls': []}
+                'covariance': [], 'planning_mean': [], 'planning_cov': [], 'mpc_ctrls': [], 'og_vals':[], 'attractor':[]}
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
@@ -83,7 +98,7 @@ class simulation_slam():
                 ctrl = np.array([2.8, 0.4])
             else:
                 obsv_lm = np.array([self.lm_id.index(item) for item in self.curr_obsv])
-                mpc_ctrls = self.mpc_planning(mean, cov, ctrl, horizon=self.horizon, obsv_lm=obsv_lm)
+                mpc_ctrls = self.mpc_planning(mean, cov, ctrl, horizon=self.horizon, obsv_lm=obsv_lm, attractor=self.attractor)
                 ctrl = mpc_ctrls[0]
                 self.log['mpc_ctrls'].append(mpc_ctrls)
             state_dr = self.env_dr.step(ctrl)
@@ -219,6 +234,12 @@ class simulation_slam():
             self.log['trajectory_slam'].append(mean[0:3].copy())
             self.log['covariance'].append(cov.copy())
 
+            # update attractor through state machine
+            self.attractor = self.state_transition(mean[0:3], cov[0:3, 0:3])
+            self.log['og_vals'].append(self.og_vals.copy())
+            attractor_log = self.attractor
+            self.log['attractor'].append(attractor_log)
+
             #########################
             # Information for debug
             #########################
@@ -229,6 +250,28 @@ class simulation_slam():
             #     print("data written success !")
 
         print("simulation finished.")
+
+    def state_transition(self, mean, cov):
+        # update og
+        for idx in range(self.grid2.shape[0]):
+            g = self.grid2[idx]
+            if np.linalg.norm(g-mean[0:2], 2) < self.sensor_range:
+                self.og_vals[idx] = 1
+            else:
+                pass
+
+        # determine attractor
+        print('state transition: ', np.trace(cov))
+        if np.trace(cov) < 0.5:
+            dist_xy = np.sqrt((self.grid[0]-mean[0])**2 + (self.grid[1]-mean[1])**2)
+            dist_flag = self.og_vals.reshape(self.num_pts, self.num_pts) < 1.0
+            dist_flag = dist_flag.astype(int) * 10000
+            dist_xy = dist_xy + dist_flag
+            attractor = self.grid2[np.argmin(dist_xy)]
+        else:
+            attractor = None
+
+        return attractor
 
     def range_bearing(self, agent, landmark):
         delta = landmark - agent[0:self.nStates - 1]
@@ -242,32 +285,35 @@ class simulation_slam():
         lm_y = agent[1] + obsv[0] * sin(agent[2] + obsv[1])
         return np.array([lm_x, lm_y])
 
-    def mpc_planning(self, meann, covv, ctrl, horizon, obsv_lm):
+    def mpc_planning(self, meann, covv, ctrl, horizon, obsv_lm, attractor=None):
         init_ctrls = np.array([ctrl.copy() for _ in range(horizon)]).reshape(-1)
         mean = meann.copy()
         cov = covv.copy()
 
-        objective = lambda ctrls : self.mpc_objective(mean, cov, ctrls, horizon, obsv_lm)
+        objective = lambda ctrls : self.mpc_objective(mean, cov, ctrls, horizon, obsv_lm, attractor)
         bounds = [[-2., 2.] for _ in range(horizon*2)]
         res = minimize(objective, x0=init_ctrls, method='trust-constr', bounds=bounds, options={'disp':True,})# 'gtol':1e-12, 'xtol':1e-12})
         # res = minimize(objective, init_ctrls, method='BFGS', tol=1e-10, options={'disp':True})
         controls = res.x.reshape(horizon, 2)
         return controls
 
-    def mpc_objective(self, meann, covv, ctrls, horizon, obsv_lmm):
+    def mpc_objective(self, meann, covv, ctrls, horizon, obsv_lmm, attractor=None):
         '''
         obsv_lm contains id for landmarks being observed in mean
         '''
         mean = meann.copy()
         cov = covv.copy()
+        obsv_lm = np.array(obsv_lmm)
         obj = 0.
 
-        # test attractor
-        robot_mean = mean[0:2]
-        attractor = mean[0:2] + np.array([-1.0, 1.0])
-        mean = np.concatenate((mean, attractor))
-        cov = np.block([[cov, np.zeros((cov.shape[0], 2))], [np.zeros((2, cov.shape[0])), np.eye(2)*1e-12]])
-        obsv_lm = np.concatenate((obsv_lmm, [ int((len(mean)-3)/2)-1 ]))
+        if attractor is None:
+            pass
+        else:
+            robot_mean = mean[0:2]
+            attractor = mean[0:2] + np.array([-1.0, 1.0])
+            mean = np.concatenate((mean, attractor))
+            cov = np.block([[cov, np.zeros((cov.shape[0], 2))], [np.zeros((2, cov.shape[0])), np.eye(2)*1e-12]])
+            obsv_lm = np.concatenate((obsv_lmm, [ int((len(mean)-3)/2)-1 ]))
 
         for t in range(horizon):
             ctrl = ctrls[2*t:2*t+2]
@@ -296,10 +342,8 @@ class simulation_slam():
             idx = -2
             for lid in obsv_lm:
                 idx += 2
-                try:
-                    lm = mean[3+lid*2 : 5+lid*2]
-                except:
-                    print(lid, mean)
+                lid = int(lid)
+                lm = mean[3+lid*2 : 5+lid*2]
                 zr = np.sqrt((r[0]-lm[0])**2 + (r[1]-lm[1])**2)
 
                 H[idx][0]       = (r[0]-lm[0]) / zr
@@ -621,64 +665,74 @@ class simulation_slam():
         plt.show()
         # return anim
 
-    def animate3(self, point_size=1, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
-        fig = plt.gcf()
+    def animate2(self, point_size=1, show_traj=True, plan=False, save=None, rate=50, title='Animation'):
+        fig = plt.figure()
+        ax = fig.add_subplot(121)
+        ax.set_aspect('equal')
+        ax.set_xlim(0, self.size)
+        ax.set_ylim(0, self.size)
+        ax.set_title(title)
 
-        ax1 = fig.add_subplot(131)
-        [xy, vals] = self.t_dist.get_grid_spec()
-        ax1.contourf(*xy, vals, levels=20)
-        ax1.scatter(self.landmarks[:, 0], self.landmarks[:, 1], color='white', marker='P')
-        ax1.set_aspect('equal', 'box')
-        ax1.set_title(title)
+        ax2 = fig.add_subplot(122)
+        ax2.set_aspect('equal')
 
-        ax2 = fig.add_subplot(132)
-        ax2.set_aspect('equal', 'box')
-        ax2.set_title('Actual Path Statistics')
-
-        ax3 = fig.add_subplot(133)
-        ax3.set_aspect('equal', 'box')
-        ax3.set_title('Estimated Path Statistics')
+        ax.scatter(self.landmarks[:,0], self.landmarks[:,1], color='black', marker='P')
 
         xt_true = np.stack(self.log['trajectory_true'])
-        points_true = ax1.scatter([], [], s=point_size, color='red')
-        agent_true = ax1.scatter([], [], s=point_size * 100, color='red', marker='8')
+        np.save('xt_true.npy', xt_true)
+        points_true = ax.scatter([], [], s=point_size, color='red')
+        agent_true = ax.scatter([], [], s=point_size * 100, color='red', marker='8')
 
         # xt_dr = np.stack(self.log['trajectory_dr'])
-        # points_dr = ax1.scatter([], [], s=point_size, c='cyan')
+        # points_dr = ax.scatter([], [], s=point_size, c='cyan')
 
-        mean_est = np.stack(self.log['mean'])
-        xt_est = mean_est[:, 0:3]
-        points_est = ax1.scatter([], [], s=point_size, color='green')
-        agent_est = ax1.scatter([], [], s=point_size * 100, color='green', marker='8')
+        mean_est = np.stack(self.log['trajectory_slam'])
+        print('mean_est.shape: ', mean_est.shape)
+        xt_est = mean_est
+        np.save('xt_est.npy', xt_est)
+        points_est = ax.scatter([], [], s=point_size, color='green')
+        agent_est = ax.scatter([], [], s=point_size * 100, color='green', marker='8')
 
-        mean_plan = np.stack(self.log['planning_mean'])
-        xt_plan = mean_plan[:, 0:3]
-        points_plan = ax1.scatter([], [], s=point_size, color='yellow')
-        agent_plan = ax1.scatter([], [], s=point_size * 100, color='yellow', marker='8')
+        if plan:
+            mean_plan = np.stack(self.log['planning_mean'])
+            xt_plan = mean_plan[:, 0:3]
+        points_plan = ax.scatter([], [], s=point_size, color='yellow')
+        agent_plan = ax.scatter([], [], s=point_size * 100, color='yellow', marker='8')
 
         observation_lines = []
         landmark_ellipses = []
         for id in range(self.landmarks.shape[0]):
-            observation_lines.append(ax1.plot([], [], color='orange'))
-            landmark_ellipses.append(ax1.scatter([], [], s=point_size, c='cyan'))
+            observation_lines.append(ax.plot([], [], color='orange'))
+            landmark_ellipses.append(ax.scatter([], [], s=point_size, c='blue'))
 
-        agent_ellipse = ax1.scatter([], [], s=point_size, c='green')
-        agent_plan_ellipse = ax1.scatter([], [], s=point_size, c='yellow')
+        agent_ellipse = ax.scatter([], [], s=point_size, c='green')
+        agent_plan_ellipse = ax.scatter([], [], s=point_size, c='yellow')
 
-        # ax1.legend([points_true, points_dr, points_est], ['True Path', 'Dead Reckoning Path', 'Estimated Path'])
-        ax1.legend([agent_true, agent_est], ['True Path', 'Estimated Path'])
+        # plt.legend([points_true, points_dr, points_est], ['True Path', 'Dead Reckoning Path', 'Estimated Path'])
+        plt.legend([agent_true, agent_est], ['True Path', 'Estimated Path'])
 
         sensor_points = []
         for id in range(self.landmarks.shape[0]):
-            sensor_point = ax1.plot([], [], color='orange')
+            sensor_point = ax.plot([], [], color='orange')
             sensor_points.append(sensor_point)
 
+        sim_traj = ax.scatter([], [], s=point_size, c='purple')
+
+        cmap2 = plt.get_cmap('gray')
+        levels = MaxNLocator(nbins=50).tick_values(0.5, 1.0)
+        norm = BoundaryNorm(levels, ncolors=cmap2.N, clip=True)
+
         def sub_animate(i):
+            # for debug: save frame
+            # if i == 1600:
+            #     plt.savefig('frame-1600.png')
+
             # visualize agent location / trajectory
             if (show_traj):
                 points_true.set_offsets(np.array([xt_true[:i, 0], xt_true[:i, 1]]).T)
                 points_est.set_offsets(np.array([xt_est[:i, 0], xt_est[:i, 1]]).T)
-                # points_plan.set_offsets(np.array([xt_plan[:i, 0], xt_plan[:i, 1]]).T)
+                if plan:
+                    points_plan.set_offsets(np.array([xt_plan[:i, 0], xt_plan[:i, 1]]).T)
 
                 agent_true.set_offsets(np.array([[xt_true[i, 0]], [xt_true[i, 1]]]).T)
                 agent_est.set_offsets(np.array([[xt_est[i, 0]], [xt_est[i, 1]]]).T)
@@ -713,14 +767,13 @@ class simulation_slam():
             for id in range(self.nLandmark):
                 landmark_ellipses[id].set_offsets(np.array([[], []]).T)
 
-            for id in range(self.nLandmark):
-                if mean[2 + 2 * id + 1] == 0:
-                    pass
-                else:
-                    landmark_mean = mean[2 + 2 * id + 1: 2 + 2 * id + 2 + 1]
-                    landmark_cov = cov[2 + 2 * id + 1: 2 + 2 * id + 2 + 1, 2 + 2 * id + 1: 2 + 2 * id + 2 + 1]
-                    p_landmark = self.generate_landmark_ellipse(landmark_mean, landmark_cov)
-                    landmark_ellipses[id].set_offsets(np.array([p_landmark[0, :], p_landmark[1, :]]).T)
+            num_lm = int((mean.shape[0]-3)/2)
+            for id in range(num_lm):
+                landmark_mean = self.log['mean'][i][2 + 2 * id + 1: 2 + 2 * id + 2 + 1]
+                landmark_cov = self.log['covariance'][i][2 + 2 * id + 1: 2 + 2 * id + 2 + 1, 2 + 2 * id + 1: 2 + 2 * id + 2 + 1]
+                # print('landmark_cov: ', landmark_cov)
+                p_landmark = self.generate_landmark_ellipse(landmark_mean, landmark_cov)
+                landmark_ellipses[id].set_offsets(np.array([p_landmark[0, :], p_landmark[1, :]]).T)
 
             # clear observation model visualization
             for point in sensor_points:
@@ -728,31 +781,38 @@ class simulation_slam():
                 point[0].set_ydata([])
 
             # observation model visualization
-            for observation in self.log['observations'][i]:
-                id = int(observation[0])
-                measurement = observation[1:]
-                loc_x = xt_true[i, 0] + measurement[0] * cos(xt_true[i, 2] + measurement[1])
-                loc_y = xt_true[i, 1] + measurement[0] * sin(xt_true[i, 2] + measurement[1])
-                sensor_points[id][0].set_xdata([xt_true[i, 0], loc_x])
-                sensor_points[id][0].set_ydata([xt_true[i, 1], loc_y])
+            id = 0
+            for obsv in self.log['observations'][i]:
+                observation = obsv
+                lm = self.observe_landmark(agent_mean, observation)
+                sensor_points[id][0].set_xdata([xt_true[i, 0], lm[0]])
+                sensor_points[id][0].set_ydata([xt_true[i, 1], lm[1]])
+                id += 1
 
-            # visualize path statistics
-            path_true = xt_true[:i+1, self.model_true.explr_idx]
-            ck_true = convert_traj2ck(self.erg_ctrl_true.basis, path_true)
-            val_true = convert_ck2dist(self.erg_ctrl_true.basis, ck_true, size=self.size)
+            if i < self.switch:
+                sim_traj.set_offsets([-1., -1.])
+            else:
+                mpc_ctrls = self.log['mpc_ctrls'][i-self.switch]
+                mpc_traj = [xt_est[i][0:3]]
+                for k in range(self.horizon):
+                    ctrl = mpc_ctrls[k]
+                    state = mpc_traj[k].copy()
+                    state[0] += cos(state[2]) * ctrl[0] * 0.1
+                    state[1] += sin(state[2]) * ctrl[0] * 0.1
+                    state[2] += ctrl[1] * 0.1
+                    mpc_traj.append(state)
+                mpc_traj = np.array(mpc_traj)
+                sim_traj.set_offsets(mpc_traj[:, 0:2])
+
+            # visualize og
             ax2.cla()
-            ax2.contourf(*xy, val_true.reshape(50, 50), levels=20)
-
-            # visualize path statistics
-            path_est = xt_est[:i+1, self.model_dr.explr_idx]
-            ck_est = convert_traj2ck(self.erg_ctrl_dr.basis, path_est)
-            val_est = convert_ck2dist(self.erg_ctrl_dr.basis, ck_est, size=self.size)
-            ax3.cla()
-            ax3.contourf(*xy, val_est.reshape(50, 50), levels=20)
+            ax2.set_title('Occupancy Grid')
+            ax2_grid = ax2.pcolormesh( self.raw_grid[0], self.raw_grid[1], self.log['og_vals'][i].reshape(self.num_pts, self.num_pts), cmap=cmap2, edgecolors='k', linewidth=0.004, norm=norm )
+            print('og_vals sum: ', np.sum(self.log['og_vals'][i]))
 
             # return matplotlib objects for animation
             # ret = [points_true, points_dr, agent_ellipse, points_est]
-            ret = [points_true, agent_ellipse, points_est, agent_true, agent_est, agent_plan_ellipse, agent_plan, points_plan]
+            ret = [sim_traj, points_true, agent_ellipse, points_est, agent_true, agent_est, agent_plan_ellipse, agent_plan, points_plan]
             for item in sensor_points:
                 ret.append(item[0])
             for item in landmark_ellipses:
