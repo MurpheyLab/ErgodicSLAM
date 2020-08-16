@@ -88,12 +88,14 @@ class simulation_slam():
         state_dr = self.env_dr.reset(self.init_state)
 
         self.curr_t = 0
+        ctrl = np.array([2.8, 0.4])
         for t in tqdm(range(self.tf)):
             self.curr_t = t
             #########################
             # generate control and measurement data
             #########################
             # this is what robot thinks it's doing
+            # ctrl = np.array([0.2, -0.2])
             if t < self.switch: # default control
                 ctrl = np.array([2.8, 0.4])
             else:
@@ -235,7 +237,7 @@ class simulation_slam():
             self.log['covariance'].append(cov.copy())
 
             # update attractor through state machine
-            self.attractor = self.state_transition(mean[0:3], cov[0:3, 0:3])
+            self.attractor = self.state_transition(mean[0:3], cov[0:3, 0:3], i)
             self.log['og_vals'].append(self.og_vals.copy())
             attractor_log = self.attractor
             self.log['attractor'].append(attractor_log)
@@ -251,7 +253,7 @@ class simulation_slam():
 
         print("simulation finished.")
 
-    def state_transition(self, mean, cov):
+    def state_transition(self, mean, cov, t):
         # update og
         for idx in range(self.grid2.shape[0]):
             g = self.grid2[idx]
@@ -261,13 +263,28 @@ class simulation_slam():
                 pass
 
         # determine attractor
-        print('state transition: ', np.trace(cov))
-        if np.trace(cov) < 0.5:
+        if np.trace(cov) < 0.05:
             dist_xy = np.sqrt((self.grid[0]-mean[0])**2 + (self.grid[1]-mean[1])**2)
-            dist_flag = self.og_vals.reshape(self.num_pts, self.num_pts) < 1.0
+            dist_flag = self.og_vals.reshape(self.num_pts, self.num_pts) > 0.5
             dist_flag = dist_flag.astype(int) * 10000
             dist_xy = dist_xy + dist_flag
             attractor = self.grid2[np.argmin(dist_xy)]
+            '''
+            attractor_dist = np.linalg.norm(mean[0:2]-attractor, 2)
+            if attractor_dist > 3.0:
+                attractor = mean[0:2] + (attractor-mean[0:2]) * 3.0 / attractor_dist
+            print('dist: ', np.linalg.norm(mean[0:2]-attractor, 2))
+            '''
+            if attractor[0] < self.sensor_range-1:
+                attractor[0] = self.sensor_range - 1
+            elif attractor[0] > self.size - self.sensor_range + 1:
+                attractor[0] = self.size - self.sensor_range + 1
+            elif attractor[1] < self.sensor_range - 1:
+                attractor[1] = self.sensor_range - 1
+            elif attractor[1] > self.size - self.sensor_range + 1:
+                attractor[1] = self.size - self.sensor_range + 1
+            else:
+                pass
         else:
             attractor = None
 
@@ -294,6 +311,7 @@ class simulation_slam():
         bounds = [[-2., 2.] for _ in range(horizon*2)]
         res = minimize(objective, x0=init_ctrls, method='trust-constr', bounds=bounds, options={'disp':True,})# 'gtol':1e-12, 'xtol':1e-12})
         # res = minimize(objective, init_ctrls, method='BFGS', tol=1e-10, options={'disp':True})
+        print('obj eval: ', objective(res.x))
         controls = res.x.reshape(horizon, 2)
         return controls
 
@@ -310,11 +328,12 @@ class simulation_slam():
             pass
         else:
             robot_mean = mean[0:2]
-            attractor = mean[0:2] + np.array([-1.0, 1.0])
             mean = np.concatenate((mean, attractor))
-            cov = np.block([[cov, np.zeros((cov.shape[0], 2))], [np.zeros((2, cov.shape[0])), np.eye(2)*1e-12]])
+            cov = np.block([[cov, np.zeros((cov.shape[0], 2))], [np.zeros((2, cov.shape[0])), np.eye(2)*1e-16]])
             obsv_lm = np.concatenate((obsv_lmm, [ int((len(mean)-3)/2)-1 ]))
 
+        bnd1 = 0.
+        bnd2 = 0.
         for t in range(horizon):
             ctrl = ctrls[2*t:2*t+2]
             # obj += 50. ** np.linalg.norm(ctrl) - 1.
@@ -335,6 +354,14 @@ class simulation_slam():
             g[2] = ctrl[1]
             mean += g * 0.1
             mean[2] = normalize_angle(mean[2])
+
+            # boundary penalty
+            dist_xl = mean[0] - 0. + 1e-09
+            dist_xr = self.size - mean[0] + 1e-09
+            bnd1 += np.exp(-dist_xl*3) + np.exp(-dist_xr*3)
+            dist_yl = mean[1] - 0. + 1e-09
+            dist_yr = self.size - mean[1] + 1e-09
+            bnd2 += np.exp(-dist_yl*3) + np.exp(-dist_yr*3)
 
             num_obsv = obsv_lm.shape[0]
             H = np.zeros((num_obsv*2, mean.shape[0]))
@@ -363,29 +390,8 @@ class simulation_slam():
             K = cov @ H.T @ np.linalg.inv(H @ cov @ H.T + BigQ)
             cov = cov - K @ H @ cov
 
-        # print('cov: ', np.exp( np.log( (np.linalg.det(cov))**(1/mean.shape[0]) ) ) )# + obj * 0.00000001 )
-        # print('obj: ', obj * 0.000001)
-
         # A-optimality
-        return np.trace(cov) #+ obj * 0.00000001
-
-        # test D-optimality: 0
-        # return np.linalg.det(cov) + obj * 0.00000001
-
-        # test D-optimality: 1
-        # return np.exp( np.log( (np.linalg.det(cov))**(1/mean.shape[0]) ) ) + obj * 0.00000001
-
-        # test D-optimality: 2
-        '''
-        obj = np.linalg.det(cov[0:3, 0:3])
-        num_lm = int((mean.shape[0]-3) / 2)
-        for i in range(num_lm):
-            obj += np.linalg.det(cov[3+i*2:5+i*2, 3+i*2:5+i*2])
-        return obj
-        '''
-
-        # test E-optimality
-        # return 0.5 * np.log(2*np.pi*np.e)**mean.shape[0] * np.linalg.norm(cov)
+        return np.trace(cov)  + (bnd1 + bnd2) * 1.0
 
     # mpc-based implementaton of ekf-ml prediction,
     #   assume all landmarks observed at last time step
@@ -692,6 +698,7 @@ class simulation_slam():
         np.save('xt_est.npy', xt_est)
         points_est = ax.scatter([], [], s=point_size, color='green')
         agent_est = ax.scatter([], [], s=point_size * 100, color='green', marker='8')
+        attractor_pos = ax.scatter([], [], s=point_size*50, color='blue', marker='X')
 
         if plan:
             mean_plan = np.stack(self.log['planning_mean'])
@@ -789,6 +796,7 @@ class simulation_slam():
                 sensor_points[id][0].set_ydata([xt_true[i, 1], lm[1]])
                 id += 1
 
+            '''
             if i < self.switch:
                 sim_traj.set_offsets([-1., -1.])
             else:
@@ -803,16 +811,24 @@ class simulation_slam():
                     mpc_traj.append(state)
                 mpc_traj = np.array(mpc_traj)
                 sim_traj.set_offsets(mpc_traj[:, 0:2])
+            '''
 
             # visualize og
             ax2.cla()
             ax2.set_title('Occupancy Grid')
             ax2_grid = ax2.pcolormesh( self.raw_grid[0], self.raw_grid[1], self.log['og_vals'][i].reshape(self.num_pts, self.num_pts), cmap=cmap2, edgecolors='k', linewidth=0.004, norm=norm )
-            print('og_vals sum: ', np.sum(self.log['og_vals'][i]))
+
+            # plot attractor
+            if self.log['attractor'][i] is None:
+                attractor_pos.set_offsets([-10., -10.])
+            else:
+                attractor_pos.set_offsets(self.log['attractor'][i])
+                ax2.scatter(self.log['attractor'][i][0], self.log['attractor'][i][1], s=point_size*20, color='red', marker='s')
+
 
             # return matplotlib objects for animation
             # ret = [points_true, points_dr, agent_ellipse, points_est]
-            ret = [sim_traj, points_true, agent_ellipse, points_est, agent_true, agent_est, agent_plan_ellipse, agent_plan, points_plan]
+            ret = [sim_traj, points_true, agent_ellipse, points_est, agent_true, agent_est, agent_plan_ellipse, agent_plan, points_plan, attractor_pos]
             for item in sensor_points:
                 ret.append(item[0])
             for item in landmark_ellipses:

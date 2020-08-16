@@ -16,7 +16,8 @@ import autograd.numpy as np
 size = 20.0
 # size = 25.0
 noise = 0.005
-init_state = np.array([11., 2., 0.0])
+# init_state = np.array([11., 2., 0.0])
+init_state = np.array([2., 2., 0.])
 envTrue = IntegratorSE2(size=size)
 modelTrue = IntegratorSE2(size=size)
 envDR = IntegratorSE2(size=size)
@@ -38,12 +39,12 @@ ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid
 
 """start simulation"""
 tf = 200
-# lanmark distribution 1: uniform
-# landmarks1 = np.random.uniform(0.5, 7.5, size=(6, 2))
-# landmarks2 = np.random.uniform(12.5, 19.5, size=(4, 2))
-# landmarks = np.concatenate((landmarks1, landmarks2))
+# lanmark distribution 1: cornered
+landmarks1 = np.random.uniform(0.5, 3.5, size=(5, 2))
+landmarks2 = np.random.uniform(16.5, 19.5, size=(5, 2))
+landmarks = np.concatenate((landmarks1, landmarks2))
 
-landmarks = np.random.uniform(0.5, 19.5, size=(25, 2))
+# landmarks = np.random.uniform(0.5, 19.5, size=(25, 2))
 # landmarks = np.array([[6., 14.]])
 
 sensor_range = 5
