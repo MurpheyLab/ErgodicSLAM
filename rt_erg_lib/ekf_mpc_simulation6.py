@@ -20,7 +20,7 @@ from scipy.linalg import block_diag
 
 class simulation_slam():
     def __init__(self, size, init_state, t_dist, model_true, erg_ctrl_true, env_true, model_dr, erg_ctrl_dr, env_dr, tf,
-                 landmarks, sensor_range, motion_noise, measure_noise, static_test, horizon, switch, num_pts):
+                 landmarks, sensor_range, motion_noise, measure_noise, static_test, horizon, switch, num_pts, stm_threshold):
         self.size = size
         self.init_state = init_state
         self.tf = tf
@@ -41,7 +41,7 @@ class simulation_slam():
         self.R = np.diag(motion_noise) ** 2
         self.measure_noise = measure_noise
         self.Q = np.diag(measure_noise) ** 2
-        self.observed_landmarks = np.zeros(self.landmarks.shape[0])
+        self.observed_landmarks = []
         self.curr_obsv = []
         # self.threshold = 99999999
         self.threshold = 0.
@@ -54,7 +54,9 @@ class simulation_slam():
         self.attractor = None
 
         self.num_pts = num_pts
+        self.stm_threshold = stm_threshold
         self.og_vals = np.ones(self.num_pts * self.num_pts) * 0.5
+        self.true_og_vals = np.ones(self.num_pts**2) * 0.5
         self.raw_grid = np.meshgrid(*[np.linspace(0, self.size, self.num_pts+1) for _ in range(2)])
         self.grid = [self.raw_grid[0][0:self.num_pts,0:self.num_pts], self.raw_grid[1][0:self.num_pts,0:self.num_pts]]
         self.grid2 = np.c_[self.grid[0].ravel(), self.grid[1].ravel()]
@@ -82,8 +84,14 @@ class simulation_slam():
         ##########################
         # simulation loop
         ##########################
-        self.log = {'trajectory_true': [], 'trajectory_dr': [], 'true_landmarks': [], 'observations': [], 'mean': [], 'trajectory_slam': [],
-                'covariance': [], 'planning_mean': [], 'planning_cov': [], 'mpc_ctrls': [], 'og_vals':[], 'attractor':[]}
+        self.log = {'trajectory_true': [], 'trajectory_dr': [], \
+                    'true_landmarks': [], 'observations': [], \
+                    'mean': [], 'trajectory_slam': [], 'covariance': [],\
+                    'planning_mean': [], 'planning_cov': [], 'mpc_ctrls': [], \
+                    'og_vals':[], 'attractor':[], 'world':self.landmarks.copy(), \
+                    'pose_err':[], 'lm_avg_err':[],\
+                    'est_area_coverage':[], 'true_area_coverage':[], \
+                    'landmark_coverage':[], 'pose_uncertainty':[]}
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
@@ -118,6 +126,10 @@ class simulation_slam():
                 item = self.landmarks[i]
                 dist = sqrt((item[0] - state_true[0]) ** 2 + (item[1] - state_true[1]) ** 2)
                 if (dist <= self.sensor_range):
+                    if i in self.observed_landmarks:
+                        pass
+                    else:
+                        self.observed_landmarks.append(i)
                     true_landmarks.append(i)
                     noisy_observation = self.range_bearing(state_true, item)
                     noisy_observation += self.measure_noise * np.random.randn(2)
@@ -233,12 +245,44 @@ class simulation_slam():
                 cov = cov - K @ H @ cov
 
             self.log['mean'].append(mean.copy())
+            self.log['pose_uncertainty'].append(np.trace(cov[0:3,0:3]))
             self.log['trajectory_slam'].append(mean[0:3].copy())
             self.log['covariance'].append(cov.copy())
 
-            # update attractor through state machine
-            self.attractor = self.state_transition(mean[0:3], cov[0:3, 0:3], i)
+            # compute estimation errors (for both pose and landmarks)
+            self.log['pose_err'].append(np.linalg.norm(mean[0:2]-state_true[0:2]))
+            lm_avg_err = 0
+            for idx in self.observed_landmarks:
+                lm_id = self.observed_landmarks.index(idx)
+                try:
+                    lm_avg_err += np.linalg.norm( mean[3+2*lm_id:5+2*lm_id]-self.landmarks[idx] )
+                except:
+                    print('mean: ', mean)
+                    print('lm: ', self.landmarks)
+                    print('idx: ', idx)
+            if len(self.observed_landmarks) != 0:
+                lm_avg_err /= len(self.observed_landmarks)
+            self.log['lm_avg_err'].append(lm_avg_err)
+
+            # compute area coverage ratio
+            # update og
+            for idx in range(self.grid2.shape[0]):
+                g = self.grid2[idx]
+                if np.linalg.norm(g-mean[0:2], 2) < self.sensor_range:
+                    self.og_vals[idx] = 1
+                else:
+                    pass
+                if np.linalg.norm(g-state_true[0:2], 2) < self.sensor_range:
+                    self.true_og_vals[idx] = 1
+                else:
+                    pass
             self.log['og_vals'].append(self.og_vals.copy())
+            self.log['est_area_coverage'].append( 2*np.sum(self.og_vals)/self.num_pts**2 - 1.0 )
+            self.log['true_area_coverage'].append( 2*np.sum(self.true_og_vals)/self.num_pts**2 - 1.0 )
+            self.log['landmark_coverage'].append(1.0 * len(self.observed_landmarks) / len(self.landmarks))
+
+            # update attractor through state machine
+            self.attractor = self.state_transition(mean, cov[0:3, 0:3], i)
             attractor_log = self.attractor
             self.log['attractor'].append(attractor_log)
 
@@ -252,18 +296,19 @@ class simulation_slam():
             #     print("data written success !")
 
         print("simulation finished.")
+        return self.log
 
     def state_transition(self, mean, cov, t):
-        # update og
-        for idx in range(self.grid2.shape[0]):
-            g = self.grid2[idx]
-            if np.linalg.norm(g-mean[0:2], 2) < self.sensor_range:
-                self.og_vals[idx] = 1
+        if np.sum(self.og_vals) == self.og_vals.shape[0]:
+            if len(self.curr_obsv)  == 0:
+                attractor = mean[3:5]
             else:
-                pass
+                attractor = None
+            return attractor
+
 
         # determine attractor
-        if np.trace(cov) < 0.05:
+        if np.trace(cov) < self.stm_threshold:
             dist_xy = np.sqrt((self.grid[0]-mean[0])**2 + (self.grid[1]-mean[1])**2)
             dist_flag = self.og_vals.reshape(self.num_pts, self.num_pts) > 0.5
             dist_flag = dist_flag.astype(int) * 10000
@@ -275,6 +320,7 @@ class simulation_slam():
                 attractor = mean[0:2] + (attractor-mean[0:2]) * 3.0 / attractor_dist
             print('dist: ', np.linalg.norm(mean[0:2]-attractor, 2))
             '''
+            '''
             if attractor[0] < self.sensor_range-1:
                 attractor[0] = self.sensor_range - 1
             elif attractor[0] > self.size - self.sensor_range + 1:
@@ -285,8 +331,12 @@ class simulation_slam():
                 attractor[1] = self.size - self.sensor_range + 1
             else:
                 pass
+            '''
         else:
-            attractor = None
+            if len(self.curr_obsv) == 0:
+                attractor = mean[3:5]
+            else:
+                attractor = None
 
         return attractor
 
@@ -346,7 +396,12 @@ class simulation_slam():
                     [self.R, np.zeros((3, 2*num_lm))],
                     [np.zeros((2*num_lm, 3)), np.zeros((2*num_lm,2*num_lm))]
                 ])
-            cov = G @ cov @ G.T + BigR
+            try:
+                cov = G @ cov @ G.T + BigR
+            except:
+                print('G: ', G.shape)
+                print('cov: ', cov.shape)
+                print('BigR: ', BigR.shape)
 
             g = np.zeros(mean.shape[0])
             g[0] = cos(mean[2]) * ctrl[0]

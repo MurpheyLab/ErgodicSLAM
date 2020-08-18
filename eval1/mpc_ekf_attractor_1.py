@@ -38,21 +38,49 @@ ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=horizon, num_basis=num_bas
 ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
 """start simulation"""
-tf = 600
+tf = 500
 # lanmark distribution 1: cornered
 landmarks1 = np.random.uniform(0.5, 3.5, size=(5, 2))
 landmarks2 = np.random.uniform(16.5, 19.5, size=(5, 2))
 landmarks = np.concatenate((landmarks1, landmarks2))
 
-# landmarks = np.random.uniform(0.5, 19.5, size=(25, 2))
-# landmarks = np.array([[6., 14.]])
+# landmarks = np.random.uniform(0.5, 19.5, size=(10, 2))
 
 sensor_range = 5
 motion_noise = np.array([0.04, 0.04, 0.01])
 measure_noise = np.array([0.01, 0.01])
-erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, static_test=45, horizon=3, switch=1, num_pts=50, stm_threshold=1.5)
-erg_ctrl_sim.start(report=True, debug=True)
+erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, static_test=45, horizon=3, switch=1, num_pts=50, stm_threshold=0.5)
+log = erg_ctrl_sim.start(report=True, debug=True)
 erg_ctrl_sim.animate2(point_size=1, show_traj=True, plan=False, title='Landmarks Distribution')
 # erg_ctrl_sim.plot(point_size=1, save=None)
 # erg_ctrl_sim.path_reconstruct(save=None)
 # erg_ctrl_sim.static_test_plot(point_size=1, save=None)
+
+fig = plt.figure()
+
+ax1 = fig.add_subplot(231)
+ax1.set_title('Pose Uncertainty')
+ax1.plot(np.arange(tf)*0.1, log['pose_uncertainty'])
+
+ax2 = fig.add_subplot(232)
+ax2.set_title('Pose Est Error')
+ax2.plot(np.arange(tf)*0.1, log['pose_err'])
+
+ax3 = fig.add_subplot(233)
+ax3.set_title('Landmark Avg Est Error')
+ax3.plot(np.arange(tf)*0.1, log['lm_avg_err'])
+
+ax4 = fig.add_subplot(234)
+ax4.set_title('Actual Area Coverage')
+ax4.plot(np.arange(tf)*0.1, log['true_area_coverage'])
+
+ax5 = fig.add_subplot(235)
+ax5.set_title('Est Area Coverage')
+ax5.plot(np.arange(tf)*0.1, log['est_area_coverage'])
+
+ax6 = fig.add_subplot(236)
+ax6.set_title('Landmark Coverage')
+ax6.plot(np.arange(tf)*0.1, log['landmark_coverage'])
+
+plt.show()
+
