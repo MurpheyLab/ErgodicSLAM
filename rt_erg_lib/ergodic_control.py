@@ -106,9 +106,12 @@ class RTErgodicControl(object):
 
             self.u_seq[t] = -np.dot(np.dot(self.Rinv, fdu[t].T), rho)
 
+            '''
             # if (np.abs(self.u_seq[t]) > 1.0).any():
             if (np.abs(self.u_seq[t]) > 2.0).any():
-                self.u_seq[t] /= np.linalg.norm(self.u_seq[t]) / 2.0
+                self.u_seq[t] /= np.linalg.norm(self.u_seq[t])# / 2.0
+            '''
+            self.u_seq[t] = np.clip(self.u_seq[t], -2, 2) # not sure if it's valid
 
         self.replay_buffer.push(state[self.model.explr_idx])
 

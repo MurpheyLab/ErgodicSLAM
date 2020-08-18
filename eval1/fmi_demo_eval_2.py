@@ -25,7 +25,7 @@ from math import sin, cos
 from math import pi
 
 """initialization"""
-tf = 700
+tf = 200
 size = 20.0
 # size = 25.0
 noise = 0.005
@@ -87,12 +87,41 @@ sensor_range = 5
 motion_noise = np.array([0.04, 0.04, 0.01])
 measure_noise = np.array([0.01, 0.01])
 erg_ctrl_sim = simulation_slam(size, init_state, t_dist, modelTrue, ergCtrlTrue, envTrue, modelDR, ergCtrlDR, envDR, tf, landmarks, sensor_range, motion_noise, measure_noise, switch=1)
-erg_ctrl_sim.start(report=True, debug=False, update=7)
+log = erg_ctrl_sim.start(report=True, debug=False, update=7)
 
 # erg_ctrl_sim.animate_eval(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
 # erg_ctrl_sim.animate2(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=50)
-erg_ctrl_sim.animate4(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=100)
-# erg_ctrl_sim.animate(point_size=1, show_traj=True, plan=False, title='Landmarks Distribution')
+# erg_ctrl_sim.animate4(point_size=1, alpha=1, show_traj=True, title='Landmarks Distribution Test', rate=100)
+erg_ctrl_sim.animate(point_size=1, show_traj=True, plan=False, title='Landmarks Distribution')
 
-erg_ctrl_sim.plot(point_size=1, save=None)
-erg_ctrl_sim.evaluate()
+# erg_ctrl_sim.plot(point_size=1, save=None)
+# erg_ctrl_sim.evaluate()
+
+fig = plt.figure()
+
+ax1 = fig.add_subplot(231)
+ax1.set_title('Pose Uncertainty')
+ax1.plot(np.arange(tf)*0.1, log['pose_uncertainty'])
+
+ax2 = fig.add_subplot(232)
+ax2.set_title('Pose Est Error')
+ax2.plot(np.arange(tf)*0.1, log['pose_err'])
+
+ax3 = fig.add_subplot(233)
+ax3.set_title('Landmark Avg Est Error')
+ax3.plot(np.arange(tf)*0.1, log['lm_avg_err'])
+
+ax4 = fig.add_subplot(234)
+ax4.set_title('Actual Ara Coverage')
+ax4.plot(np.arange(tf)*0.1, log['true_area_coverage'])
+
+ax5 = fig.add_subplot(235)
+ax5.set_title('Est Area Coverage')
+ax5.plot(np.arange(tf)*0.1, log['est_area_coverage'])
+
+ax6 = fig.add_subplot(236)
+ax6.set_title('Landmark Coverage')
+ax6.plot(np.arange(tf)*0.1, log['landmark_coverage'])
+
+plt.show()
+

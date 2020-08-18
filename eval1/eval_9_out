@@ -1,0 +1,8 @@
+====== ergodic control ======
+avg pose uncertainty:  0.3079535737717178
+avg pose error:  1.416962809340069
+avg landmark error:  1.271579198717541
+====== model predictive control ======
+avg pose uncertainty:  0.3310189941649353
+avg pose error:  0.3764498042980315
+avg landmark error:  0.01726230265225938

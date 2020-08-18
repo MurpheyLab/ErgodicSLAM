@@ -48,7 +48,7 @@ class simulation_slam():
         self.measure_noise = measure_noise
         self.Q = np.diag(measure_noise) ** 2
         self.mcov_inv = np.linalg.inv(self.Q)
-        self.observed_landmarks = np.zeros(self.landmarks.shape[0])
+        self.observed_landmarks = []
         self.new_observed = None
         self.threshold = 99999999
         self.new_lm = []
@@ -86,8 +86,17 @@ class simulation_slam():
         ##########################
         # simulation loop
         ##########################
-        self.log = {'tf': self.tf, 'trajectory_true': [], 'trajectory_dr': [], 'true_landmarks': [], 'observations': [], 'mean': [],
-                'covariance': [], 'planning_mean': [], 'planning_cov': [], 'target_dist': [], 'error':[], 'uncertainty':[], 'metric_true':[], 'metric_est':[], 'metric_error':[], 'landmarks':self.landmarks, 'trajectory_slam':[], 'erg_ctrls':[], 'og_vals':[], 'mi_vals':[], 'area_cov_est':[], 'area_cov_true':[]}
+        self.log = {'tf': self.tf, 'trajectory_true': [], 'trajectory_dr': [], \
+                    'true_landmarks': [], 'observations': [], \
+                    'mean': [], 'covariance': [], 'world':self.landmarks.copy(), \
+                    'planning_mean': [], 'planning_cov': [], \
+                    'target_dist': [], 'error':[], 'uncertainty':[], \
+                    'metric_true':[], 'metric_est':[], 'metric_error':[], \
+                    'landmarks':self.landmarks, 'trajectory_slam':[], \
+                    'erg_ctrls':[], 'og_vals':[], 'mi_vals':[], \
+                    'est_area_coverage':[], 'true_area_coverage':[], \
+                    'pose_err':[], 'lm_avg_err':[], \
+                    'landmark_coverage':[], 'pose_uncertainty':[]}
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
@@ -119,6 +128,10 @@ class simulation_slam():
                 item = self.landmarks[i]
                 dist = sqrt((item[0] - state_true[0]) ** 2 + (item[1] - state_true[1]) ** 2)
                 if (dist <= self.sensor_range):
+                    if i in self.observed_landmarks:
+                        pass
+                    else:
+                        self.observed_landmarks.append(i)
                     true_landmarks.append(i)
                     noisy_observation = self.range_bearing(state_true, item)
                     noisy_observation += self.measure_noise * np.random.randn(2)
@@ -230,8 +243,7 @@ class simulation_slam():
                     self.true_og_vals[idx] = 1
                 else:
                     pass
-            true_area_cov = np.sum(self.true_og_vals) / (0.5 * len(temp_grid)) - 1
-            self.log['area_cov_true'].append(true_area_cov)
+            self.log['true_area_coverage'].append( 2*np.sum(self.true_og_vals)/self.num_pts**2 - 1.0 )
 
             dx = 1.0 * self.size / self.num_pts
             clip_idx_x = int(mean[0]/dx)
@@ -253,14 +265,21 @@ class simulation_slam():
             self.og_vals = np.clip(self.og_vals, a_min=None, a_max=1.)
             self.log['og_vals'].append(self.og_vals.copy())
 
-            est_area_cov = np.sum(self.og_vals) / (0.5 * len(temp_grid)) - 1
-            self.log['area_cov_est'].append(est_area_cov)
+            self.log['est_area_coverage'].append(  2*np.sum(np.clip(self.og_vals,0.0,1.0))/self.num_pts**2 - 1.0  )
 
             #########################
             # Record error and uncertainty for evaluation
             #########################
-            self.log['uncertainty'].append(np.linalg.det(cov[0: self.nStates, 0: self.nStates]))
-            self.log['error'].append(np.sqrt( (state_true[0]-mean[0])**2 + (state_true[1]-mean[1])**2 ))
+            self.log['pose_uncertainty'].append(np.trace(cov[0: self.nStates, 0: self.nStates]))
+            self.log['pose_err'].append(np.linalg.norm(mean[0:2]-state_true[0:2], 2))
+            lm_avg_err = 0
+            for idx in self.observed_landmarks:
+                lm_id = self.observed_landmarks.index(idx)
+                lm_avg_err += np.linalg.norm( mean[3+2*lm_id : 5+2*lm_id] - self.landmarks[idx] )
+            if len(self.observed_landmarks) != 0:
+                lm_avg_err /= len(self.observed_landmarks)
+            self.log['lm_avg_err'].append(lm_avg_err)
+            self.log['landmark_coverage'].append(1.0 * len(self.observed_landmarks) / len(self.landmarks))
 
             #########################
             # update target distribution and ergodic controller
@@ -586,7 +605,7 @@ class simulation_slam():
         ax.scatter(self.landmarks[:,0], self.landmarks[:,1], color='black', marker='P')
 
         xt_true = np.stack(self.log['trajectory_true'])
-        np.save('xt_true.npy', xt_true)
+        # np.save('xt_true.npy', xt_true)
         points_true = ax.scatter([], [], s=point_size, color='red')
         agent_true = ax.scatter([], [], s=point_size * 100, color='red', marker='8')
 
@@ -596,7 +615,7 @@ class simulation_slam():
         mean_est = np.stack(self.log['trajectory_slam'])
         print('mean_est.shape: ', mean_est.shape)
         xt_est = mean_est
-        np.save('xt_est.npy', xt_est)
+        # np.save('xt_est.npy', xt_est)
         points_est = ax.scatter([], [], s=point_size, color='green')
         agent_est = ax.scatter([], [], s=point_size * 100, color='green', marker='8')
 
