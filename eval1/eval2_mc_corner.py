@@ -16,14 +16,14 @@ import matplotlib.pyplot as plt
 
 
 """initialization"""
-tf = 50
+tf = 500
 size = 20.0
 
 sensor_range = 5
 motion_noise = np.array([0.04, 0.04, 0.01])
 measure_noise = np.array([0.01, 0.01])
 
-num_mc = 2
+num_mc = 10
 erg_log = []
 mpc_attractor_log = []
 mpc_log = []

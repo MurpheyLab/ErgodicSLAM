@@ -16,14 +16,14 @@ import matplotlib.pyplot as plt
 
 
 """initialization"""
-tf = 50
+tf = 500
 size = 20.0
 
 sensor_range = 5
 motion_noise = np.array([0.04, 0.04, 0.01])
 measure_noise = np.array([0.01, 0.01])
 
-num_mc = 2
+num_mc = 10
 erg_log = []
 mpc_attractor_log = []
 mpc_log = []
@@ -32,14 +32,14 @@ for exp_idx in range(num_mc):
     print('iter: {}'.format(exp_idx))
 
     """landmark generation"""
-    landmarks1 = np.random.uniform(0.5, 3.5, size=(5, 2))
-    landmarks2 = np.random.uniform(16.5, 19.5, size=(5, 2))
-    landmarks = np.concatenate((landmarks1, landmarks2))
+    # landmarks1 = np.random.uniform(0.5, 3.5, size=(5, 2))
+    # landmarks2 = np.random.uniform(16.5, 19.5, size=(5, 2))
+    # landmarks = np.concatenate((landmarks1, landmarks2))
 
-    # landmarks = np.random.uniform(0.5, 19.5, size=(10,2))
+    landmarks = np.random.uniform(9.5, 11.5, size=(10,2))
 
-    init_state = np.array([3.0, 3.0, 0.0])
-    # init_state = np.array([size/2., size/2., 0.])
+    # init_state = np.array([3.0, 3.0, 0.0])
+    init_state = np.array([size/2., size/2., 0.])
 
     """ergodic ekf config"""
 
