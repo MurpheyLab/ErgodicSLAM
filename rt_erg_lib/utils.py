@@ -69,7 +69,7 @@ def normalize_angle(angle):
 
     return normAngle
     '''
-    return (angle + pi) % (2 * pi) - pi
+    return (angle + pi) % (2 * pi)  - pi
 
 def normalize_angle2(angle):
     return 0

@@ -1,0 +1,91 @@
+import numpy as np
+from numpy import sin, cos, pi
+from gym.spaces import Box
+from .utils import *
+
+class IntegratorSE2(object):
+    def __init__(self, size=1.0):
+        self.observation_space = Box(np.array([0., 0., 0.]),
+                                     np.array([size, size, size]),
+                                     dtype=np.float32)
+        print("observation_space.shape = ", self.observation_space.shape)
+
+        self.action_space = Box(np.array([-size, -size]),
+                                np.array([size, size]),
+                                dtype=np.float32)
+
+        self.explr_space = Box(np.array([0., 0., -pi]),
+                               np.array([size, size, pi]),
+                               dtype=np.float32)
+
+        self.explr_idx  = [0, 1, 2]
+
+        self.dt = 0.1
+
+        self.reset()
+
+    def fdx(self, x, u):
+        '''
+        State linearization
+        '''
+        return np.array([
+            [ 0., 0., -sin(x[2])*u[0]],
+            [ 0., 0.,  cos(x[2])*u[0]],
+            [ 0., 0.,              0.]
+        ])
+
+    def fdu(self, x):
+        '''
+        Control linearization
+        '''
+        self.B = np.array([
+            [cos(x[2]), 0.],
+            [sin(x[2]), 0.],
+            [0., 1.]
+        ])
+        return self.B.copy()
+
+    def reset(self, state=None):
+        '''
+        Resets the property self.state
+        '''
+        if state is None:
+            # self.state = np.zeros(self.observation_space.shape[0])
+            self.state = np.random.uniform(0., 0.9, size=(3,))
+        else:
+            self.state = state.copy()
+
+        return self.state.copy()
+
+    def f(self, x, u):
+        '''
+        Continuous time dynamics
+        '''
+        return np.array([cos(x[2])*u[0], sin(x[2])*u[0], u[1]])
+
+    def step(self, a):
+        '''
+        Basic euler step
+        '''
+        # TODO: include ctrl clip
+        # print("self.f: ", self.f(self.state, a))
+        self.state = self.state + self.f(self.state, a) * self.dt
+        # self.state = self.state + np.array([cos(self.state[2])*a[0], sin(self.state[2])*a[0], a[1], 0, 0, 0]) * self.dt
+        self.state[2] = normalize_angle(self.state[2])
+        return self.state.copy()
+
+    def noisy_step(self, a, noise):
+        '''
+        Basic euler step with noise
+        '''
+        # self.state = self.state + self.f(self.state, a) * self.dt + noise * np.random.randn(self.observation_space.shape[0])
+        self.state += self.f(self.state, a) * self.dt + np.random.normal(0, noise)
+        self.state[2] = normalize_angle(self.state[2])
+        return self.state.copy()
+
+    def Gx(self, x, u):
+        return np.array([
+            [1, 0, -u[0] * sin(x[2]) * self.dt],
+            [0, 1, u[0] * cos(x[2]) * self.dt],
+            [0, 0, 1]
+        ])

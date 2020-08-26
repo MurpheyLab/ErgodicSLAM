@@ -7,7 +7,7 @@ class RTErgodicControl(object):
 
     def __init__(self, model, target_dist,
                     weights=None, horizon=100, num_basis=5,
-                    capacity=100000, batch_size=20, ctrl_lim=[-2.0, 2.0]):
+                    capacity=100000, batch_size=20):
 
         self.model       = model
         self.target_dist = target_dist
@@ -33,8 +33,6 @@ class RTErgodicControl(object):
         self._phik = None
         self.ck = None
         self.init_phik = None
-
-        self.ctrl_lim = ctrl_lim
 
     def reset(self):
         self.u_seq = [0.0*self.model.action_space.sample()
@@ -108,12 +106,10 @@ class RTErgodicControl(object):
 
             self.u_seq[t] = -np.dot(np.dot(self.Rinv, fdu[t].T), rho)
 
-            '''
             if (np.abs(self.u_seq[t]) > 1.0).any():
                  self.u_seq[t] /= np.linalg.norm(self.u_seq[t])# / 2.0
-            '''
 
-            self.u_seq[t] = np.clip(self.u_seq[t], self.ctrl_lim[0], self.ctrl_lim[1]) # not sure if it's valid
+            # self.u_seq[t] = np.clip(self.u_seq[t], -0.1, 0.1) # not sure if it's valid
 
         self.replay_buffer.push(state[self.model.explr_idx])
 

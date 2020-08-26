@@ -12,6 +12,8 @@ class Barrier(object):
         self.pow = pow
         self.weight = weight
         self.eps = 0.01
+        # self.eps = 0.1
+        print('barrier high: {}, barrier low: {}'.format(explr_space.high, explr_space.low))
 
     def cost(self, x):
         '''

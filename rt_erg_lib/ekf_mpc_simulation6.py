@@ -67,7 +67,7 @@ class simulation_slam():
         self.dist_xy = np.sqrt(self.diff_x**2 + self.diff_y**2)
         self.dist_flag = (self.dist_xy < self.sensor_range).astype(int)
 
-    def start(self, report=False, debug=False):
+    def start(self, report=False, debug=False, no_attractor=False):
         #########################
         # initialize mean and covariance matrix
         #########################
@@ -91,7 +91,8 @@ class simulation_slam():
                     'og_vals':[], 'attractor':[], 'world':self.landmarks.copy(), \
                     'pose_err':[], 'lm_avg_err':[],\
                     'est_area_coverage':[], 'true_area_coverage':[], \
-                    'landmark_coverage':[], 'pose_uncertainty':[]}
+                    'landmark_coverage':[], 'pose_uncertainty':[], \
+                    'ctrl_effort': []}
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
@@ -111,6 +112,7 @@ class simulation_slam():
                 mpc_ctrls = self.mpc_planning(mean, cov, ctrl, horizon=self.horizon, obsv_lm=obsv_lm, attractor=self.attractor)
                 ctrl = mpc_ctrls[0]
                 self.log['mpc_ctrls'].append(mpc_ctrls)
+            self.log['ctrl_effort'].append(np.linalg.norm(ctrl, 2))
             state_dr = self.env_dr.step(ctrl)
             self.log['trajectory_dr'].append(state_dr)
 
@@ -284,6 +286,9 @@ class simulation_slam():
             # update attractor through state machine
             self.attractor = self.state_transition(mean, cov[0:3, 0:3], i)
             attractor_log = self.attractor
+            if no_attractor is True:
+                self.attractor=None
+                attractor_log = None
             self.log['attractor'].append(attractor_log)
 
             #########################

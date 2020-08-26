@@ -9,11 +9,12 @@ class Basis(object):
         if offset is not None:
             raise NotImplementedError('Have not implemented offsets')
         self.dl  = explr_space.high - explr_space.low
-        self.dl = np.array([explr_space.high[0], explr_space.high[0]])
+        # self.dl = np.array([explr_space.high[0], explr_space.high[0]])
         n = explr_space.shape[0]
         k = np.meshgrid(*[[i for i in range(num_basis)] for _ in range(n)])
 
-        self.k = np.c_[k[0].ravel(), k[1].ravel()]
+        # self.k = np.c_[k[0].ravel(), k[1].ravel()]
+        self.k = np.stack([kk.ravel() for kk in k]).T
 
         self.hk = np.zeros(self.k.shape[0])
 

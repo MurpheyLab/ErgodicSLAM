@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 
 """initialization"""
-tf = 500
+tf = 100
 size = 20.0
 init_state = np.array([3.0, 3.0, 0.0])
 

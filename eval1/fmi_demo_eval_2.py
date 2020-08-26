@@ -25,7 +25,7 @@ from math import sin, cos
 from math import pi
 
 """initialization"""
-tf = 200
+tf = 500
 size = 20.0
 # size = 25.0
 noise = 0.005

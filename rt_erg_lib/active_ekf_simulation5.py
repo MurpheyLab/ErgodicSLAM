@@ -96,7 +96,8 @@ class simulation_slam():
                     'erg_ctrls':[], 'og_vals':[], 'mi_vals':[], \
                     'est_area_coverage':[], 'true_area_coverage':[], \
                     'pose_err':[], 'lm_avg_err':[], \
-                    'landmark_coverage':[], 'pose_uncertainty':[]}
+                    'landmark_coverage':[], 'pose_uncertainty':[], \
+                    'ctrl_effort':[]}
         state_true = self.env_true.reset(self.init_state)
         state_dr = self.env_dr.reset(self.init_state)
 
@@ -113,6 +114,7 @@ class simulation_slam():
             else:
                 ctrl, erg_ctrls = self.erg_ctrl_dr(mean[0:self.nStates], get_useq=True)
                 self.log['erg_ctrls'].append(erg_ctrls)
+            self.log['ctrl_effort'].append(np.linalg.norm(ctrl, 2))
             state_dr = self.env_dr.step(ctrl)
             self.log['trajectory_dr'].append(state_dr)
 
