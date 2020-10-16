@@ -10,13 +10,14 @@ from rt_erg_lib.utils import *
 
 from rt_erg_lib.ekf_mpc_simulation6 import simulation_slam as ekf_mpc_simulation
 from rt_erg_lib.active_ekf_simulation5 import simulation_slam as ekf_erg_simulation
+# from rt_erg_lib.active_ekf_simulation4 import simulation_slam as ekf_erg_simulation
 
 import autograd.numpy as np
 import matplotlib.pyplot as plt
-
+import time
 
 """initialization"""
-tf = 500
+tf = 800
 size = 20.0
 
 sensor_range = 5
@@ -36,10 +37,10 @@ for exp_idx in range(num_mc):
     # landmarks2 = np.random.uniform(16.5, 19.5, size=(5, 2))
     # landmarks = np.concatenate((landmarks1, landmarks2))
 
-    landmarks = np.random.uniform(0.5, 19.5, size=(10,2))
+    landmarks = np.concatenate(( np.random.uniform(0.5, 19.5, size=(9,2)) , np.array([[3.5, 3.5]])))
 
-    # init_state = np.array([3.0, 3.0, 0.0])
-    init_state = np.array([size/2., size/2., 0.])
+    init_state = np.array([3.0, 3.0, 0.0])
+    # init_state = np.array([size/2., size/2., 0.])
 
     """ergodic ekf config"""
 
@@ -53,11 +54,11 @@ for exp_idx in range(num_mc):
     t_dist = DynTargetDist(num_pts=50, means=means, vars=vars, size=size)
 
     erg_horizon = 100
-    batch_size = -1
+    batch_size = 500
 
-    ergCtrlTrue = RTErgodicControl(modelTrue, t_dist, horizon=erg_horizon, num_basis=15, batch_size=batch_size)
+    ergCtrlTrue = RTErgodicControl(modelTrue, t_dist, horizon=erg_horizon, num_basis=10, batch_size=batch_size)
     ergCtrlTrue.phik = convert_phi2phik(ergCtrlTrue.basis, t_dist.grid_vals, t_dist.grid)
-    ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=erg_horizon, num_basis=15, batch_size=batch_size)
+    ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=erg_horizon, num_basis=10, batch_size=batch_size)
     ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
     ergCtrlDR.init_phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
@@ -80,11 +81,11 @@ for exp_idx in range(num_mc):
     t_dist = StaticTargetDist(num_pts=50, means=means, vars=vars, size=size)
 
     erg_horizon = 100
-    batch_size = -1
+    batch_size = 500
 
-    ergCtrlTrue = RTErgodicControl(modelTrue, t_dist, horizon=erg_horizon, num_basis=15, batch_size=batch_size)
+    ergCtrlTrue = RTErgodicControl(modelTrue, t_dist, horizon=erg_horizon, num_basis=10, batch_size=batch_size)
     ergCtrlTrue.phik = convert_phi2phik(ergCtrlTrue.basis, t_dist.grid_vals, t_dist.grid)
-    ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=erg_horizon, num_basis=15, batch_size=batch_size)
+    ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=erg_horizon, num_basis=10, batch_size=batch_size)
     ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
     ergCtrlDR.init_phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
@@ -93,7 +94,7 @@ for exp_idx in range(num_mc):
                                  modelDR, ergCtrlDR, envDR, \
                                  tf, landmarks, sensor_range, \
                                  motion_noise, measure_noise, static_test=45, \
-                                 horizon=3, switch=1, num_pts=50, stm_threshold=0.5)
+                                 horizon=5, switch=1, num_pts=50, stm_threshold=0.5)
     mpc_attractor_log.append( mpc_attractor_sim.start(report=True, debug=False, no_attractor=False) )
 
     """mpc ekf no atttractor config"""
@@ -108,7 +109,7 @@ for exp_idx in range(num_mc):
     t_dist = StaticTargetDist(num_pts=50, means=means, vars=vars, size=size)
 
     erg_horizon = 100
-    batch_size = -1
+    batch_size = 500
 
     ergCtrlTrue = RTErgodicControl(modelTrue, t_dist, horizon=erg_horizon, num_basis=15, batch_size=batch_size)
     ergCtrlTrue.phik = convert_phi2phik(ergCtrlTrue.basis, t_dist.grid_vals, t_dist.grid)
@@ -121,106 +122,123 @@ for exp_idx in range(num_mc):
                                  modelDR, ergCtrlDR, envDR, \
                                  tf, landmarks, sensor_range, \
                                  motion_noise, measure_noise, static_test=45, \
-                                 horizon=3, switch=1, num_pts=50, stm_threshold=0.5)
+                                 horizon=5, switch=1, num_pts=50, stm_threshold=0.5)
     mpc_log.append( mpc_sim.start(report=True, debug=False, no_attractor=True) )
 
 """compute average metrics"""
-pose_uncertainty_mpc = []
-pose_err_mpc = []
-landmark_coverage_mpc = []
-ctrl_effort_mpc = []
-for log in mpc_log:
-    pose_uncertainty_avg = np.sum(log['pose_uncertainty']) / len(log['pose_uncertainty'])
-    pose_uncertainty_mpc.append( pose_uncertainty_avg )
-    pose_err_avg = np.sum(log['pose_err']) / len(log['pose_err'])
-    pose_err_mpc.append( pose_err_avg )
-    landmark_coverage_mpc.append( log['landmark_coverage'][-1] )
-    ctrl_effort_avg = np.sum(log['ctrl_effort']) / len(log['ctrl_effort'])
-    ctrl_effort_mpc.append( ctrl_effort_avg )
+with open('eval_2020_10_13_mc_uniform_{}.txt'.format(int(time.time())), 'w') as f:
+    pose_uncertainty_mpc = []
+    pose_err_mpc = []
+    landmark_coverage_mpc = []
+    ctrl_effort_mpc = []
+    for log in mpc_log:
+        pose_uncertainty_avg = np.sum(log['pose_uncertainty']) / len(log['pose_uncertainty'])
+        pose_uncertainty_mpc.append( pose_uncertainty_avg )
+        pose_err_avg = np.sum(log['pose_err']) / len(log['pose_err'])
+        pose_err_mpc.append( pose_err_avg )
+        landmark_coverage_mpc.append( log['landmark_coverage'][-1] )
+        ctrl_effort_avg = np.sum(log['ctrl_effort']) / len(log['ctrl_effort'])
+        ctrl_effort_mpc.append( ctrl_effort_avg )
 
-pose_uncertainty_mpc = np.array(pose_uncertainty_mpc)
-pose_err_mpc = np.array(pose_err_mpc)
-landmark_coverage_mpc = np.array(landmark_coverage_mpc)
-ctrl_effort_mpc = np.array(ctrl_effort_mpc)
+    pose_uncertainty_mpc = np.array(pose_uncertainty_mpc)
+    pose_err_mpc = np.array(pose_err_mpc)
+    landmark_coverage_mpc = np.array(landmark_coverage_mpc)
+    ctrl_effort_mpc = np.array(ctrl_effort_mpc)
 
-pose_uncertainty_mpc_mean = pose_uncertainty_mpc.mean()
-pose_uncertainty_mpc_std = pose_uncertainty_mpc.std()
-pose_err_mpc_mean = pose_err_mpc.mean()
-pose_err_mpc_std = pose_err_mpc.std()
-landmark_coverage_mpc_mean = landmark_coverage_mpc.mean()
-landmark_coverage_mpc_std = landmark_coverage_mpc.std()
-ctrl_effort_mpc_mean = ctrl_effort_mpc.mean()
-ctrl_effort_mpc_std = ctrl_effort_mpc.std()
+    pose_uncertainty_mpc_mean = pose_uncertainty_mpc.mean()
+    pose_uncertainty_mpc_std = pose_uncertainty_mpc.std()
+    pose_err_mpc_mean = pose_err_mpc.mean()
+    pose_err_mpc_std = pose_err_mpc.std()
+    landmark_coverage_mpc_mean = landmark_coverage_mpc.mean()
+    landmark_coverage_mpc_std = landmark_coverage_mpc.std()
+    ctrl_effort_mpc_mean = ctrl_effort_mpc.mean()
+    ctrl_effort_mpc_std = ctrl_effort_mpc.std()
 
-print('\n------ mpc no attractor ------')
-print('pose uncertainty: {} +- {}'.format(pose_uncertainty_mpc_mean, pose_uncertainty_mpc_std))
-print('pose estimation err: {} +- {}'.format(pose_err_mpc_mean, pose_err_mpc_std))
-print('landmark coverage: {} +- {}'.format(landmark_coverage_mpc_mean, landmark_coverage_mpc_std))
-print('control effort: {} +- {}'.format(ctrl_effort_mpc_mean, ctrl_effort_mpc_std))
+    print('\n------ mpc no attractor ------')
+    f.write('\n------ mpc no attractor ------\n')
+    print('pose uncertainty: {} +- {}'.format(pose_uncertainty_mpc_mean, pose_uncertainty_mpc_std))
+    f.write('pose uncertainty: {} +- {}\n'.format(pose_uncertainty_mpc_mean, pose_uncertainty_mpc_std))
+    print('pose estimation err: {} +- {}'.format(pose_err_mpc_mean, pose_err_mpc_std))
+    f.write('pose estimation err: {} +- {}\n'.format(pose_err_mpc_mean, pose_err_mpc_std))
+    print('landmark coverage: {} +- {}'.format(landmark_coverage_mpc_mean, landmark_coverage_mpc_std))
+    f.write('landmark coverage: {} +- {}\n'.format(landmark_coverage_mpc_mean, landmark_coverage_mpc_std))
+    print('control effort: {} +- {}'.format(ctrl_effort_mpc_mean, ctrl_effort_mpc_std))
+    f.write('control effort: {} +- {}\n'.format(ctrl_effort_mpc_mean, ctrl_effort_mpc_std))
 
-pose_uncertainty_mpca = []
-pose_err_mpca = []
-landmark_coverage_mpca = []
-ctrl_effort_mpca = []
-for log in mpc_attractor_log:
-    pose_uncertainty_avg = np.sum(log['pose_uncertainty']) / len(log['pose_uncertainty'])
-    pose_uncertainty_mpca.append( pose_uncertainty_avg )
-    pose_err_avg = np.sum(log['pose_err']) / len(log['pose_err'])
-    pose_err_mpca.append( pose_err_avg )
-    landmark_coverage_mpca.append( log['landmark_coverage'][-1] )
-    ctrl_effort_avg = np.sum(log['ctrl_effort']) / len(log['ctrl_effort'])
-    ctrl_effort_mpca.append( ctrl_effort_avg )
+    pose_uncertainty_mpca = []
+    pose_err_mpca = []
+    landmark_coverage_mpca = []
+    ctrl_effort_mpca = []
+    for log in mpc_attractor_log:
+        pose_uncertainty_avg = np.sum(log['pose_uncertainty']) / len(log['pose_uncertainty'])
+        pose_uncertainty_mpca.append( pose_uncertainty_avg )
+        pose_err_avg = np.sum(log['pose_err']) / len(log['pose_err'])
+        pose_err_mpca.append( pose_err_avg )
+        landmark_coverage_mpca.append( log['landmark_coverage'][-1] )
+        ctrl_effort_avg = np.sum(log['ctrl_effort']) / len(log['ctrl_effort'])
+        ctrl_effort_mpca.append( ctrl_effort_avg )
 
-pose_uncertainty_mpca = np.array(pose_uncertainty_mpca)
-pose_err_mpca = np.array(pose_err_mpca)
-landmark_coverage_mpca = np.array(landmark_coverage_mpca)
-ctrl_effort_mpca = np.array(ctrl_effort_mpca)
+    pose_uncertainty_mpca = np.array(pose_uncertainty_mpca)
+    pose_err_mpca = np.array(pose_err_mpca)
+    landmark_coverage_mpca = np.array(landmark_coverage_mpca)
+    ctrl_effort_mpca = np.array(ctrl_effort_mpca)
 
-pose_uncertainty_mpca_mean = pose_uncertainty_mpca.mean()
-pose_uncertainty_mpca_std = pose_uncertainty_mpca.std()
-pose_err_mpca_mean = pose_err_mpca.mean()
-pose_err_mpca_std = pose_err_mpca.std()
-landmark_coverage_mpca_mean = landmark_coverage_mpca.mean()
-landmark_coverage_mpca_std = landmark_coverage_mpca.std()
-ctrl_effort_mpca_mean = ctrl_effort_mpca.mean()
-ctrl_effort_mpca_std = ctrl_effort_mpca.std()
+    pose_uncertainty_mpca_mean = pose_uncertainty_mpca.mean()
+    pose_uncertainty_mpca_std = pose_uncertainty_mpca.std()
+    pose_err_mpca_mean = pose_err_mpca.mean()
+    pose_err_mpca_std = pose_err_mpca.std()
+    landmark_coverage_mpca_mean = landmark_coverage_mpca.mean()
+    landmark_coverage_mpca_std = landmark_coverage_mpca.std()
+    ctrl_effort_mpca_mean = ctrl_effort_mpca.mean()
+    ctrl_effort_mpca_std = ctrl_effort_mpca.std()
 
-print('\n------ mpc + attractor ------')
-print('pose uncertainty: {} +- {}'.format(pose_uncertainty_mpca_mean, pose_uncertainty_mpca_std))
-print('pose estimation err: {} +- {}'.format(pose_err_mpca_mean, pose_err_mpca_std))
-print('landmark coverage: {} +- {}'.format(landmark_coverage_mpca_mean, landmark_coverage_mpca_std))
-print('control effort: {} +- {}'.format(ctrl_effort_mpca_mean, ctrl_effort_mpca_std))
+    print('\n------ mpc + attractor ------')
+    f.write('\n------ mpc + attractor ------\n')
+    print('pose uncertainty: {} +- {}'.format(pose_uncertainty_mpca_mean, pose_uncertainty_mpca_std))
+    f.write('pose uncertainty: {} +- {}\n'.format(pose_uncertainty_mpca_mean, pose_uncertainty_mpca_std))
+    print('pose estimation err: {} +- {}'.format(pose_err_mpca_mean, pose_err_mpca_std))
+    f.write('pose estimation err: {} +- {}\n'.format(pose_err_mpca_mean, pose_err_mpca_std))
+    print('landmark coverage: {} +- {}'.format(landmark_coverage_mpca_mean, landmark_coverage_mpca_std))
+    f.write('landmark coverage: {} +- {}\n'.format(landmark_coverage_mpca_mean, landmark_coverage_mpca_std))
+    print('control effort: {} +- {}'.format(ctrl_effort_mpca_mean, ctrl_effort_mpca_std))
+    f.write('control effort: {} +- {}\n'.format(ctrl_effort_mpca_mean, ctrl_effort_mpca_std))
 
-pose_uncertainty_erg = []
-pose_err_erg = []
-landmark_coverage_erg = []
-ctrl_effort_erg = []
-for log in erg_log:
-    pose_uncertainty_avg = np.sum(log['pose_uncertainty']) / len(log['pose_uncertainty'])
-    pose_uncertainty_erg.append( pose_uncertainty_avg )
-    pose_err_avg = np.sum(log['pose_err']) / len(log['pose_err'])
-    pose_err_erg.append( pose_err_avg )
-    landmark_coverage_erg.append( log['landmark_coverage'][-1] )
-    ctrl_effort_avg = np.sum(log['ctrl_effort']) / len(log['ctrl_effort'])
-    ctrl_effort_erg.append( ctrl_effort_avg )
+    pose_uncertainty_erg = []
+    pose_err_erg = []
+    landmark_coverage_erg = []
+    ctrl_effort_erg = []
+    for log in erg_log:
+        pose_uncertainty_avg = np.sum(log['pose_uncertainty']) / len(log['pose_uncertainty'])
+        pose_uncertainty_erg.append( pose_uncertainty_avg )
+        pose_err_avg = np.sum(log['pose_err']) / len(log['pose_err'])
+        pose_err_erg.append( pose_err_avg )
+        landmark_coverage_erg.append( log['landmark_coverage'][-1] )
+        ctrl_effort_avg = np.sum(log['ctrl_effort']) / len(log['ctrl_effort'])
+        ctrl_effort_erg.append( ctrl_effort_avg )
 
-pose_uncertainty_erg = np.array(pose_uncertainty_erg)
-pose_err_erg = np.array(pose_err_erg)
-landmark_coverage_erg = np.array(landmark_coverage_erg)
-ctrl_effort_erg = np.array(ctrl_effort_erg)
+    pose_uncertainty_erg = np.array(pose_uncertainty_erg)
+    pose_err_erg = np.array(pose_err_erg)
+    landmark_coverage_erg = np.array(landmark_coverage_erg)
+    ctrl_effort_erg = np.array(ctrl_effort_erg)
 
-pose_uncertainty_erg_mean = pose_uncertainty_erg.mean()
-pose_uncertainty_erg_std = pose_uncertainty_erg.std()
-pose_err_erg_mean = pose_err_erg.mean()
-pose_err_erg_std = pose_err_erg.std()
-landmark_coverage_erg_mean = landmark_coverage_erg.mean()
-landmark_coverage_erg_std = landmark_coverage_erg.std()
-ctrl_effort_erg_mean = ctrl_effort_erg.mean()
-ctrl_effort_erg_std = ctrl_effort_erg.std()
+    pose_uncertainty_erg_mean = pose_uncertainty_erg.mean()
+    pose_uncertainty_erg_std = pose_uncertainty_erg.std()
+    pose_err_erg_mean = pose_err_erg.mean()
+    pose_err_erg_std = pose_err_erg.std()
+    landmark_coverage_erg_mean = landmark_coverage_erg.mean()
+    landmark_coverage_erg_std = landmark_coverage_erg.std()
+    ctrl_effort_erg_mean = ctrl_effort_erg.mean()
+    ctrl_effort_erg_std = ctrl_effort_erg.std()
 
-print('\n------ ergodic exploration ------')
-print('pose uncertainty: {} +- {}'.format(pose_uncertainty_erg_mean, pose_uncertainty_erg_std))
-print('pose estimation err: {} +- {}'.format(pose_err_erg_mean, pose_err_erg_std))
-print('landmark coverage: {} +- {}'.format(landmark_coverage_erg_mean, landmark_coverage_erg_std))
-print('control effort: {} +- {}'.format(ctrl_effort_erg_mean, ctrl_effort_erg_std))
+    print('\n------ ergodic exploration ------')
+    f.write('\n------ ergodic exploration ------\n')
+    print('pose uncertainty: {} +- {}'.format(pose_uncertainty_erg_mean, pose_uncertainty_erg_std))
+    f.write('pose uncertainty: {} +- {}\n'.format(pose_uncertainty_erg_mean, pose_uncertainty_erg_std))
+    print('pose estimation err: {} +- {}'.format(pose_err_erg_mean, pose_err_erg_std))
+    f.write('pose estimation err: {} +- {}\n'.format(pose_err_erg_mean, pose_err_erg_std))
+    print('landmark coverage: {} +- {}'.format(landmark_coverage_erg_mean, landmark_coverage_erg_std))
+    f.write('landmark coverage: {} +- {}\n'.format(landmark_coverage_erg_mean, landmark_coverage_erg_std))
+    print('control effort: {} +- {}'.format(ctrl_effort_erg_mean, ctrl_effort_erg_std))
+    f.write('control effort: {} +- {}\n'.format(ctrl_effort_erg_mean, ctrl_effort_erg_std))
 
+    f.close()

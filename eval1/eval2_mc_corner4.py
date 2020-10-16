@@ -33,11 +33,22 @@ for exp_idx in range(num_mc):
     print('iter: {}'.format(exp_idx))
 
     """landmark generation"""
-    landmarks1 = np.random.uniform(0.5, 3.5, size=(5, 2))
-    landmarks2 = np.random.uniform(16.5, 19.5, size=(5, 2))
-    landmarks = np.concatenate((landmarks1, landmarks2))
+    # landmarks1 = np.random.uniform(0.5, 3.5, size=(5, 2))
+    # landmarks2 = np.random.uniform(16.5, 19.5, size=(5, 2))
+    # landmarks = np.concatenate((landmarks1, landmarks2))
 
     # landmarks = np.random.uniform(0.5, 19.5, size=(10,2))
+
+    lm_x_1 = np.random.uniform(0.5, 3.5, size=6)
+    lm_x_2 = np.random.uniform(16.5, 19.5, size=4)
+    lm_x = np.concatenate((lm_x_1, lm_x_2))
+    lm_y_1 = np.random.uniform(0.5, 3.5, size=4)
+    lm_y_2 = np.random.uniform(16.5, 19.5, size=2)
+    lm_y_3 = np.random.uniform(0.5, 3.5, size=2)
+    lm_y_4 = np.random.uniform(16.5, 19.5, size=2)
+    lm_y = np.concatenate((lm_y_1, lm_y_2, lm_y_3, lm_y_4))
+    landmarks = np.stack((lm_x, lm_y)).T
+    print('landmarks.shape: ', landmarks.shape)
 
     init_state = np.array([3.0, 3.0, 0.0])
     # init_state = np.array([size/2., size/2., 0.])
@@ -126,7 +137,7 @@ for exp_idx in range(num_mc):
     mpc_log.append( mpc_sim.start(report=True, debug=False, no_attractor=True) )
 
 """compute average metrics"""
-with open('eval_2020_10_13_mc_corner_{}.txt'.format(int(time.time())), 'w') as f:
+with open('eval_2020_10_13_mc_corner4_{}.txt'.format(int(time.time())), 'w') as f:
     pose_uncertainty_mpc = []
     pose_err_mpc = []
     landmark_coverage_mpc = []

@@ -1,0 +1,18 @@
+
+------ mpc no attractor ------
+pose uncertainty: 0.003704092649982652 +- 0.0
+pose estimation err: 0.46776507431731035 +- 0.0
+landmark coverage: 0.5 +- 0.0
+control effort: 0.9396534804148626 +- 0.0
+
+------ mpc + attractor ------
+pose uncertainty: 0.1915221523234994 +- 0.0
+pose estimation err: 0.7134376098550866 +- 0.0
+landmark coverage: 0.5 +- 0.0
+control effort: 1.9030722018113158 +- 0.0
+
+------ ergodic exploration ------
+pose uncertainty: 0.3009347664604276 +- 0.0
+pose estimation err: 1.012729723669422 +- 0.0
+landmark coverage: 1.0 +- 0.0
+control effort: 1.9639974472953137 +- 0.0

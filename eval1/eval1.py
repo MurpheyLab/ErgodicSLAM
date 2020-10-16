@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 
 """initialization"""
-tf = 50
+tf = 800
 size = 20.0
 init_state = np.array([3.0, 3.0, 0.0])
 
@@ -42,11 +42,11 @@ vars = [np.array([1.2, 1.2])**2, np.array([1.2, 1.2])**2]
 t_dist = DynTargetDist(num_pts=50, means=means, vars=vars, size=size)
 
 erg_horizon = 100
-batch_size = -1
+batch_size = 500
 
-ergCtrlTrue = RTErgodicControl(modelTrue, t_dist, horizon=erg_horizon, num_basis=15, batch_size=batch_size)
+ergCtrlTrue = RTErgodicControl(modelTrue, t_dist, horizon=erg_horizon, num_basis=10, batch_size=batch_size)
 ergCtrlTrue.phik = convert_phi2phik(ergCtrlTrue.basis, t_dist.grid_vals, t_dist.grid)
-ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=erg_horizon, num_basis=15, batch_size=batch_size)
+ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=erg_horizon, num_basis=10, batch_size=batch_size)
 ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 ergCtrlDR.init_phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
@@ -69,11 +69,11 @@ vars = [np.array([1.2, 1.2])**2, np.array([1.2, 1.2])**2]
 t_dist = StaticTargetDist(num_pts=50, means=means, vars=vars, size=size)
 
 erg_horizon = 100
-batch_size = -1
+batch_size = 500
 
-ergCtrlTrue = RTErgodicControl(modelTrue, t_dist, horizon=erg_horizon, num_basis=15, batch_size=batch_size)
+ergCtrlTrue = RTErgodicControl(modelTrue, t_dist, horizon=erg_horizon, num_basis=10, batch_size=batch_size)
 ergCtrlTrue.phik = convert_phi2phik(ergCtrlTrue.basis, t_dist.grid_vals, t_dist.grid)
-ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=erg_horizon, num_basis=15, batch_size=batch_size)
+ergCtrlDR = RTErgodicControl(modelDR, t_dist, horizon=erg_horizon, num_basis=10, batch_size=batch_size)
 ergCtrlDR.phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 ergCtrlDR.init_phik = convert_phi2phik(ergCtrlDR.basis, t_dist.grid_vals, t_dist.grid)
 
@@ -82,7 +82,7 @@ mpc_sim = ekf_mpc_simulation(size, init_state, t_dist, \
                              modelDR, ergCtrlDR, envDR, \
                              tf, landmarks, sensor_range, \
                              motion_noise, measure_noise, static_test=45, \
-                             horizon=3, switch=1, num_pts=50, stm_threshold=0.5)
+                             horizon=5, switch=1, num_pts=50, stm_threshold=0.5)
 mpc_log = mpc_sim.start(report=True, debug=False)
 
 """print log""" # what's elapsed time here?
@@ -143,27 +143,29 @@ fig2 = plt.figure(2)
 point_size = 10
 
 ax1_fig2 = fig2.add_subplot(121)
-ax1_fig2.set_title('Ergodic Trajectory')
+ax1_fig2.set_title('Ergodic Trajectory', fontsize=30, pad=10)
 ax1_fig2.set_aspect('equal')
 ax1_fig2.set_xlim(0, size)
 ax1_fig2.set_ylim(0, size)
-ax1_fig2.scatter(landmarks[:,0], landmarks[:,1], c='black', marker='+')
+ax1_fig2.scatter(landmarks[:,0], landmarks[:,1], c='black', marker='+', s=120)
 xt_true = np.stack(erg_log['trajectory_true'])
 xt_est = np.stack(erg_log['trajectory_slam'])
 ax1_fig2.scatter(xt_true[:,0], xt_true[:,1], c='red', s=point_size)
 ax1_fig2.scatter(xt_est[:,0], xt_est[:,1], c='blue', s=point_size)
-ax1_fig2.legend(['Landmarks', 'True Traj', 'Est Traj'])
+ax1_fig2.legend(['Landmarks', 'True Traj', 'Est Traj'], fontsize=20, loc=4)
+ax1_fig2.tick_params(axis='both', which='major', labelsize=30)
 
-ax2_fig2 = fig2.add_subplot(122)
-ax2_fig2.set_title('MPC Trajectory')
+ax2_fig2 = fig2.add_subplot(122, sharey=ax1_fig2)
+ax2_fig2.set_title('MPC Trajectory', fontsize=30, pad=10)
 ax2_fig2.set_aspect('equal')
 ax2_fig2.set_xlim(0, size)
 ax2_fig2.set_ylim(0, size)
-ax2_fig2.scatter(landmarks[:,0], landmarks[:,1], c='black', marker='+')
+ax2_fig2.scatter(landmarks[:,0], landmarks[:,1], c='black', marker='+', s=120)
 xt_true = np.stack(mpc_log['trajectory_true'])
 xt_est = np.stack(mpc_log['trajectory_slam'])
 ax2_fig2.scatter(xt_true[:,0], xt_true[:,1], c='red', s=point_size)
 ax2_fig2.scatter(xt_est[:,0], xt_est[:,1], c='blue', s=point_size)
-ax2_fig2.legend(['Landmarks', 'True Traj', 'Est Traj'])
+ax2_fig2.legend(['Landmarks', 'True Traj', 'Est Traj'], fontsize=20, loc=4)
+ax2_fig2.tick_params(axis='both', which='major', labelsize=30)
 
 plt.show()

@@ -65,7 +65,7 @@ class simulation_slam():
         self.diff_y = self.grid_y - self.grid_y[:,np.newaxis]
         self.dist_xy = np.sqrt(self.diff_x**2 + self.diff_y**2)
         self.dist_flag = (self.dist_xy < self.sensor_range).astype(int)
-        self.init_phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.t_dist.target_grid_vals, self.t_dist.grid)
+        self.init_phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.t_dist.target_grid_vals, self.t_dist.grid, size=self.size)
 
         self.lm_id = []
         self.curr_obsv = []
@@ -315,7 +315,7 @@ class simulation_slam():
                     self.new_lm = []
 
             # update phi for ergodic controller
-            self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals, self.erg_ctrl_dr.target_dist.grid)
+            self.erg_ctrl_dr.phik = convert_phi2phik(self.erg_ctrl_dr.basis, self.erg_ctrl_dr.target_dist.grid_vals, self.erg_ctrl_dr.target_dist.grid, size=self.size)
             # record target distribution for replay and visualization
             t_dist = copy.copy(self.erg_ctrl_dr.target_dist)
             self.log['target_dist'].append(t_dist)

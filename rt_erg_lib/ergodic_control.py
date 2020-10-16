@@ -76,11 +76,17 @@ class RTErgodicControl(object):
             x = self.model.step(self.u_seq[t] * 0.)
 
         # sample any past experiences
+        # if len(self.replay_buffer) > self.batch_size:
+        #     past_states = self.replay_buffer.sample(self.batch_size)
+        #     pred_traj = pred_traj + past_states
+        # else:
+        #     past_states = self.replay_buffer.sample(len(self.replay_buffer))
+        #     pred_traj = pred_traj + past_states
         if len(self.replay_buffer) > self.batch_size:
-            past_states = self.replay_buffer.sample(self.batch_size)
+            past_states = self.replay_buffer.buffer[-self.batch_size:]
             pred_traj = pred_traj + past_states
         else:
-            past_states = self.replay_buffer.sample(len(self.replay_buffer))
+            past_states = self.replay_buffer.buffer[0:]
             pred_traj = pred_traj + past_states
 
         # calculate the cks for the trajectory *** this is also in the utils file
@@ -113,7 +119,10 @@ class RTErgodicControl(object):
                  self.u_seq[t] /= np.linalg.norm(self.u_seq[t])# / 2.0
             '''
 
-            self.u_seq[t] = np.clip(self.u_seq[t], self.ctrl_lim[0], self.ctrl_lim[1]) # not sure if it's valid
+            # self.u_seq[t] = np.clip(self.u_seq[t], self.ctrl_lim[0], self.ctrl_lim[1]) # not sure if it's valid
+
+            self.u_seq[t][0] = np.clip(self.u_seq[t][0], -2, 2)
+            self.u_seq[t][1] = np.clip(self.u_seq[t][1], -2, 2)
 
         self.replay_buffer.push(state[self.model.explr_idx])
 
