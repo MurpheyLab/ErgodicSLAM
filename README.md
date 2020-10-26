@@ -19,3 +19,8 @@ cd eval1
 python3 eval2_mc_corner4.py # or: eval2_mc_corner.py eval2_mc_uniform.py
 ~~~
 
+To quickly plot the trajectories generated from MPC approach and our ergodic exploration approach:
+~~~
+cd active_ekf_demo
+python3 fmi_demo_8.py
+~~~
